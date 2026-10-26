@@ -80,7 +80,7 @@ img { display: block; max-width: 100%; }
 /* la notícia més important: foto gran i el títol a sobre */
 .portada { position: relative; display: block; width: 100%; padding: 0; border: 0; border-radius: 20px; overflow: hidden; text-align: left; background: var(--panell); box-shadow: inset 0 0 0 1px var(--vora-forta); }
 .portada-foto { display: grid; place-items: center; aspect-ratio: 4 / 3; max-width: 100%; color: var(--c); background: radial-gradient(circle at 30% 20%, color-mix(in srgb, var(--c) 22%, transparent), transparent 70%), var(--elevat); }
-.portada-foto img, .fila-foto img, .pagina-foto img { grid-area: 1 / 1; width: 100%; height: 100%; object-fit: cover; }
+.portada-foto img, .fila-foto img, .pagina-foto img { grid-area: 1 / 1; width: 100%; height: 100%; min-height: 0; object-fit: cover; }
 .portada-foto .ic, .fila-foto .ic, .pagina-foto .ic { grid-area: 1 / 1; }
 .portada-foto:has(img) .ic, .fila-foto:has(img) .ic, .pagina-foto:has(img) .ic { visibility: hidden; }
 .portada-text { position: absolute; inset: auto 0 0; display: flex; flex-direction: column; gap: 6px; padding: 60px 16px 16px; background: linear-gradient(transparent, rgba(10, 10, 10, 0.85) 45%, rgba(10, 10, 10, 0.96)); }
@@ -129,7 +129,7 @@ img { display: block; max-width: 100%; }
 .lector-pistes { flex: 1; display: flex; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; overscroll-behavior: contain; scrollbar-width: none; }
 .lector-pistes::-webkit-scrollbar { display: none; }
 .pagina { flex: none; width: 100%; height: 100%; overflow-y: auto; scroll-snap-align: start; scroll-snap-stop: always; overscroll-behavior: contain; display: flex; flex-direction: column; }
-.pagina-foto { flex: none; display: grid; place-items: center; width: 100%; aspect-ratio: 16 / 11; max-height: 46vh; color: var(--c); background: radial-gradient(circle at 30% 20%, color-mix(in srgb, var(--c) 22%, transparent), transparent 70%), var(--elevat); }
+.pagina-foto { flex: none; display: grid; place-items: center; overflow: hidden; width: 100%; aspect-ratio: 16 / 11; max-height: 46vh; color: var(--c); background: radial-gradient(circle at 30% 20%, color-mix(in srgb, var(--c) 22%, transparent), transparent 70%), var(--elevat); }
 .pagina-cos { width: 100%; max-width: 640px; margin: 0 auto; padding: 18px var(--costat-d) 20px var(--costat); display: flex; flex-direction: column; gap: 14px; }
 .pagina-cos h2 { margin: 0; font-size: 27px; font-weight: 900; line-height: 1.12; letter-spacing: -0.02em; color: #fff; text-wrap: balance; }
 .entradeta { margin: 0; font-size: 16.5px; line-height: 1.5; color: var(--text); font-weight: 500; }
@@ -233,11 +233,18 @@ img { display: block; max-width: 100%; }
 	.trofeu { padding: 24px 16px 18px; }
 
 	/* el lector: una finestra al mig, amb fletxes */
-	.lector { background: rgba(0, 0, 0, 0.72); padding: 28px; }
-	.lector-pistes { width: 100%; max-width: 820px; margin: 0 auto; border-radius: 22px; background: var(--fons); box-shadow: 0 0 0 1px var(--vora-forta), 0 30px 80px rgba(0, 0, 0, 0.6); }
-	.pagina-foto { max-height: 380px; }
-	.lector-barra { padding: 24px max(28px, calc((100% - 820px) / 2 - 64px)); }
+	.lector { background: var(--fons); }
+	.lector-barra { position: relative; flex: none; justify-content: center; padding: 16px 28px; border-bottom: 1px solid var(--vora); background: var(--fons); }
+	.lector-barra .rodo, .lector-compte, .lector-punts { background: var(--panell); box-shadow: inset 0 0 0 1px var(--vora-forta); backdrop-filter: none; -webkit-backdrop-filter: none; }
+	.lector-barra [data-tancar] { position: absolute; left: 28px; }
+	.lector-punts { position: absolute; right: 28px; margin: 0; }
 	.rodo.pas { display: grid; }
+	.pagina { padding-top: 28px; }
+	.pagina-foto { width: min(760px, calc(100% - 56px)); margin: 0 auto; aspect-ratio: 16 / 8; max-height: 380px; border-radius: 18px; box-shadow: inset 0 0 0 1px var(--vora-forta); }
+	.pagina-cos { max-width: 760px; padding: 22px 0 24px; }
+	.pagina-cos h2 { font-size: 34px; }
+	.entradeta { font-size: 18px; }
+	.vots { padding-left: 28px; padding-right: 28px; }
 }
 
 /* la vitrina es pot obrir: cada trofeu porta a la fitxa del projecte */
