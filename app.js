@@ -2,6 +2,7 @@
 // la setmana (preus, anàlisi, la cartera de prova i les apostes) i la vitrina; privat.json, xifrat, el "per què
 // t'importa" de cada notícia i les notes dels projectes. El codi es posa un cop i el mòbil el recorda. Els vots, de
 // moment, es guarden en aquest mòbil.
+import {COLOR_RESERVA, COLORS_PARTS, colorVariacio, squarify} from './grafics.js';
 import {ICONES} from './icones.js';
 
 const TEMES = {
@@ -260,6 +261,59 @@ const filaNoticia = (t) => `<button type="button" class="m-noticia" data-noticia
 		${foto(t, 'fila-foto')}<span class="fila-text">${etiqueta(t.tema, t.nova)}<b>${esc(t.titol)}</b>${xifra(t)}</span>
 	</button>`;
 
+// on són els diners: una barra repartida i la llegenda amb els euros (el mateix que a Reshi)
+function repartiment(parts) {
+	const total = parts.reduce((t, x) => t + x.valor, 0);
+	const pc = (v) => Math.round((v / total) * 100);
+	return `<div class="m-rep">
+		<h3 class="etiqueta">On són els diners</h3>
+		<div class="m-rep-barra" role="img" aria-label="${parts.map((x) => `${esc(x.nom)} ${pc(x.valor)} %`).join(', ')}">${parts.map((x) => `<i style="flex-grow:${x.valor};background:${x.color}" title="${esc(x.nom)}: ${eur(x.valor)}"></i>`).join('')}</div>
+		<ul class="m-rep-llegenda">${parts.map((x) => `<li><i style="background:${x.color}"></i><span>${esc(x.nom)}</span><b>${pc(x.valor)} %</b><small>${eur(x.valor)}</small></li>`).join('')}</ul>
+	</div>`;
+}
+
+// dins del MSCI World: el mapa de rectangles (mida = pes al fons, color = la setmana), qui l'ha mogut, sectors i països
+function dinsMsci(d, setmanaFons) {
+	if (!d) return '';
+	const W = 760;
+	const H = 400;
+	const rects = squarify(d.top.map((e) => ({...e, valor: e.pes})), 0, 0, W, H);
+	const ord = [...d.top].filter((e) => e.aporta != null).sort((a, b) => a.aporta - b.aporta);
+	const max = Math.max(...ord.map((e) => Math.abs(e.aporta)), 0.01);
+	const barres = (llista, titol) => `<div class="m-barres"><h3 class="etiqueta">${titol}</h3><ul>${llista
+		.map(([nom, pes]) => `<li><span>${esc(nom)}</span><span class="m-barra-fons"><i style="width:${(pes / llista[0][1]) * 100}%"></i></span><b>${pes.toLocaleString('ca-ES', {maximumFractionDigits: 1})} %</b></li>`)
+		.join('')}</ul></div>`;
+	return `<section class="m-bloc">
+		<h2 class="m-titol">Dins del MSCI World <small>${d.empreses.toLocaleString('ca-ES')} empreses; aquestes ${d.top.length} en són el ${d.pes_top.toLocaleString('ca-ES')} %</small></h2>
+		<div class="m-msci">
+			<div class="m-mapa">
+				<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Les empreses que més pesen al MSCI World i què han fet aquesta setmana">${rects
+					.map(
+						(r) => `<g><title>${esc(r.nom)}: ${r.pes.toLocaleString('ca-ES')} % del fons · aquesta setmana ${r.setmana != null ? pct(r.setmana) : '—'}</title>
+					<rect x="${r.x + 1}" y="${r.y + 1}" width="${Math.max(0, r.w - 2)}" height="${Math.max(0, r.h - 2)}" rx="8" fill="${colorVariacio(r.setmana)}"/>
+					${
+						r.w > 80 && r.h > 50
+							? `<text x="${r.x + 10}" y="${r.y + 26}" class="m-mapa-nom">${esc(r.nom)}</text><text x="${r.x + 10}" y="${r.y + 50}" class="m-mapa-pct">${r.setmana != null ? pct(r.setmana) : ''}</text>${r.h > 90 ? `<text x="${r.x + 10}" y="${r.y + r.h - 12}" class="m-mapa-pes">${r.pes.toLocaleString('ca-ES')} % del fons</text>` : ''}`
+							: ''
+					}</g>`,
+					)
+					.join('')}</svg>
+				<p class="m-peu">La mida és el que pesa cada empresa al fons; el color, què ha fet aquesta setmana (verd puja, vermell baixa; més intens, més moviment).${setmanaFons != null ? ` El fons sencer: ${pct(setmanaFons)}.` : ''} Pesos de la fitxa de MSCI del ${dataBarra(d.data)}.</p>
+			</div>
+			<div class="m-qui">
+				<h3 class="etiqueta">Qui ha mogut el fons aquesta setmana</h3>
+				<ul>${ord
+					.map(
+						(e) => `<li><span>${esc(e.nom)}</span><span class="m-qui-eix"><i class="${e.aporta >= 0 ? 'puja' : 'baixa'}" style="width:${(Math.abs(e.aporta) / max) * 50}%;${e.aporta >= 0 ? 'left' : 'right'}:50%"></i></span><b class="${e.aporta >= 0 ? 'puja' : 'baixa'}">${pct(e.setmana)}</b></li>`,
+					)
+					.join('')}</ul>
+				<p class="m-peu">La barra és quant ha empès el fons: el que ha fet l’empresa per com hi pesa.</p>
+			</div>
+			<div class="m-dos-barres">${barres(d.sectors, 'Per sectors')}${barres(d.paisos, 'Per països')}</div>
+		</div>
+	</section>`;
+}
+
 function vistaMercat() {
 	const m = estat.dades.mercat;
 	const s = estat.dades.setmana;
@@ -304,8 +358,9 @@ function vistaMercat() {
 	const signe = (x) => `${x >= 0 ? '+' : '−'}${eur(Math.abs(x))}`;
 	const cartera = c
 		? `<section class="m-bloc">
-		<h2 class="m-titol">La cartera de prova de Reshi <small>10.000 € ficticis que gestiono jo</small></h2>
-		<div class="m-cartera">
+		<h2 class="m-titol">Reshi Capital <small>10.000 € ficticis que gestiono jo, amb comissions i impostos de debò</small></h2>
+		<div class="m-cartera m-dues">
+			<div class="m-col">
 			<div class="m-cartera-xifres">
 				<div><span>Val ara</span><b>${eur(c.valor)}</b><small class="${c.valor >= c.capital ? 'puja' : 'baixa'}">${signe(c.valor - c.capital)} des del ${dataBarra(c.inici)}</small></div>
 				<div><span>Si ho vengués tot avui</span><b class="${c.net >= c.capital ? 'puja' : 'baixa'}">${eur(c.net)}</b><small>després de comissions i impostos</small></div>
@@ -314,6 +369,11 @@ function vistaMercat() {
 						? `<div><span>Contra ${esc(c.comparar.nom)}</span><b class="${c.valor >= c.comparar.valor ? 'puja' : 'baixa'}">${signe(c.valor - c.comparar.valor)}</b><small>${c.valor >= c.comparar.valor ? 'de moment ho faig millor que el fons sol' : 'de moment el fons sol ho faria millor'}</small></div>`
 						: ''
 				}
+			</div>
+			${repartiment([
+				...c.posicions.filter((x) => x.estat === 'oberta').map((x, i) => ({nom: x.nom, valor: x.valor, color: COLORS_PARTS[i % COLORS_PARTS.length]})),
+				{nom: 'Reserva', valor: c.liquiditat.valor, color: COLOR_RESERVA},
+			])}
 			</div>
 			<ul class="m-posicions">${c.posicions
 				.filter((x) => x.estat === 'oberta')
@@ -338,13 +398,17 @@ function vistaMercat() {
 	const preuDe = (x, moneda) => `${x.toLocaleString('ca-ES', {maximumFractionDigits: 2})} ${moneda === 'USD' ? '$' : '€'}`;
 	const apostes = ap
 		? `<section class="m-bloc">
-		<h2 class="m-titol">Les apostes de Reshi <small>1.000 € ficticis, més risc: apostes abans que passi alguna cosa</small></h2>
+		<h2 class="m-titol">Reshi Risc <small>1.000 € ficticis en jugades abans que passi alguna cosa: més risc, més emoció</small></h2>
 		<div class="m-cartera">
 			<div class="m-cartera-xifres">
 				<div><span>Val ara</span><b>${eur(ap.valor)}</b><small class="${ap.valor >= ap.capital ? 'puja' : 'baixa'}">${signe(ap.valor - ap.capital)} des del ${dataBarra(ap.inici)}</small></div>
 				<div><span>Si ho vengués tot avui</span><b class="${ap.net >= ap.capital ? 'puja' : 'baixa'}">${eur(ap.net)}</b><small>després de comissions i impostos</small></div>
 				<div><span>Encerts</span><b>${ap.tancades ? `${ap.encerts} de ${ap.tancades}` : '—'}</b><small>${ap.tancades ? 'apostes tancades que han sortit bé' : 'encara no se n’ha tancat cap'}</small></div>
 			</div>
+			${repartiment([
+				...ap.apostes.filter((x) => x.estat === 'oberta').map((x, i) => ({nom: x.nom, valor: x.valor ?? x.import, color: COLORS_PARTS[i % COLORS_PARTS.length]})),
+				{nom: 'Reserva', valor: ap.reserva, color: COLOR_RESERVA},
+			])}
 			<ul class="m-apostes-llista">${ap.apostes
 				.filter((x) => x.estat === 'oberta')
 				.map(
@@ -412,7 +476,7 @@ function vistaMercat() {
 		<span class="sobre">Mercat${s?.data ? ` · setmana del ${dataBarra(s.data)}` : ''}</span>
 		<h1>Com està el mercat</h1>
 	</header>
-	${comEsta}${perQue}${cartera}${apostes}${futur}
+	${comEsta}${perQue}${dinsMsci(estat.dades.msci, m.actius.find((x) => x.id === 'msci')?.canvis.setmana)}${cartera}${apostes}${futur}
 	<p class="m-peu">L’anàlisi es renova cada diumenge. Reshi analitza i explica: no és un assessor financer.</p>`;
 }
 
