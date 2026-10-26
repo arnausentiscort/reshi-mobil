@@ -360,3 +360,19 @@ img { display: block; max-width: 100%; }
 	.m-futur p { font-size: 14px; }
 	.m-altres { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* la notícia explicada: paràgrafs, les dades clau i més fotos */
+.pagina-cos .explica p + p { margin-top: 10px; }
+.dades { margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.dades > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 10px 12px; border-radius: 12px; background: var(--panell); box-shadow: inset 0 0 0 1px var(--vora); }
+.dades dt { font-family: var(--mono); font-size: 17px; font-weight: 800; color: var(--or); }
+.dades dd { margin: 0; font-size: 12.5px; line-height: 1.4; color: var(--text-2); }
+.fotos { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 0 calc(var(--costat-d) * -1) 0 calc(var(--costat) * -1); padding: 0 var(--costat-d) 0 var(--costat); }
+.fotos figure { flex: none; width: 78%; margin: 0; display: flex; flex-direction: column; gap: 4px; }
+.fotos img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 12px; background: var(--elevat); }
+.fotos figcaption { font-size: 11px; color: var(--text-3); }
+@media (min-width: 760px) {
+	.dades { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+	.fotos { margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+	.fotos figure { width: auto; }
+}

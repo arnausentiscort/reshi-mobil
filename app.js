@@ -475,13 +475,21 @@ function vistaLector() {
 			<h2>${esc(t.titol)}</h2>
 			${xifra(t, 'xifra gran')}
 			<p class="entradeta">${esc(t.frase)}</p>
-			<section><h3>Què passa</h3><p>${esc(t.que_passa)}</p></section>
+			<section class="explica"><h3>Què passa</h3>${(Array.isArray(t.que_passa) ? t.que_passa : [t.que_passa]).map((x) => `<p>${esc(x)}</p>`).join('')}</section>
+			${t.dades?.length ? `<section><h3>Les dades</h3><dl class="dades">${t.dades.map((d) => `<div><dt>${esc(d.valor)}</dt><dd>${esc(d.que)}</dd></div>`).join('')}</dl></section>` : ''}
 			${
-				perTu
-					? `<section class="per-tu"><h3>Per què t’importa</h3><p>${esc(perTu)}</p></section>`
-					: `<section class="per-tu tancat"><h3>${icona('cadenat', 12)} Per què t’importa</h3><p>Posa el codi a la portada per veure-ho.</p></section>`
+				t.fotos?.length
+					? `<div class="fotos">${t.fotos.map((f) => `<figure><img src="${esc(f.url)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.closest('figure').remove()"><figcaption>${esc(f.font)}</figcaption></figure>`).join('')}</div>`
+					: ''
 			}
-			<section><h3>Què pot canviar</h3><p>${esc(t.que_canvia)}</p></section>
+			${
+				!t.te_per_que
+					? ''
+					: perTu
+						? `<section class="per-tu"><h3>Per què t’importa</h3><p>${esc(perTu)}</p></section>`
+						: `<section class="per-tu tancat"><h3>${icona('cadenat', 12)} Per què t’importa</h3><p>Posa el codi a la portada per veure-ho.</p></section>`
+			}
+			${t.que_canvia ? `<section><h3>Què pot canviar</h3><p>${esc(t.que_canvia)}</p></section>` : ''}
 			${
 				t.toca?.length
 					? `<section class="que-et-fa"><h3>Què li fa al que tens o mires</h3><ul>${t.toca.map((x) => `<li>${pastilla(x)}<p>${esc(x.per_que)}</p></li>`).join('')}</ul></section>`
