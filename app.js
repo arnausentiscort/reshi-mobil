@@ -1,10 +1,8 @@
-// Reshi al mòbil: les Notícies, el Mercat i la Vitrina. Sense llibreries: dades.json té l'edició pública, els preus del
-// mercat i la vitrina; privat.json, xifrat, el "per què t'importa" de cada notícia i la situació de l'Arnau. El codi es
-// posa un cop i el mòbil el recorda. Els vots, de moment, es guarden en aquest mòbil.
+// Reshi al mòbil: les Notícies, el Mercat i la Vitrina. Sense llibreries: dades.json té l'edició pública, el mercat de
+// la setmana (preus, anàlisi, la cartera de prova i les apostes) i la vitrina; privat.json, xifrat, el "per què
+// t'importa" de cada notícia i les notes dels projectes. El codi es posa un cop i el mòbil el recorda. Els vots, de
+// moment, es guarden en aquest mòbil.
 import {ICONES} from './icones.js';
-import {caigudes, mesosFinsEnPositiu, totDeCop} from './escenaris.js';
-import {COMPROVAT, GUIA} from './guia.js';
-import {resumHistoria, simular} from './simulador.js';
 
 const TEMES = {
 	politica: {nom: 'Política', icona: 'politica'},
@@ -19,7 +17,7 @@ const TEMES = {
 const FILTRES = [
 	{id: 'totes', nom: 'Totes', temes: null},
 	{id: 'politica', nom: 'Política', temes: ['politica']},
-	{id: 'mercat', nom: 'Mercat i món', temes: ['mercat', 'cripto', 'conflictes']},
+	{id: 'mon', nom: 'Món', temes: ['conflictes']},
 	{id: 'tecnologia', nom: 'Tecnologia', temes: ['tecnologia', 'eina']},
 	{id: 'jocs', nom: 'Jocs', temes: ['jocs', 'ofertes']},
 ];
@@ -57,15 +55,13 @@ const estat = {
 	vista: 'noticies',
 	filtre: 'totes',
 	personal: null,
-	cartera: null,
 	privat: null,
 	vots: guardat.llegir('reshi-vots', {}),
 	lector: null,
 	error: null,
-	sim: guardat.llegir('reshi-sim', {msci: 60, btc: 15, eth: 0, anys: null, aportacio: null, finestra: 60}),
 	vistes: new Set(guardat.llegir('reshi-vistes', [])), // les que ja ha llegit (aquí o a l'ordinador)
 	projecte: null, // el projecte de la vitrina obert
-	inv: {siBaixa: 'msci', minim: 10, capital: 1000, mensual: 100, totCop: 'msci', anys: 5}, // "Començar a invertir"
+	lectorIds: null, // quan el lector s'obre des del Mercat: les notícies de mercat, en aquest ordre
 	llegidesAbans: new Set(), // les llegides quan es va pintar la llista: l'ordre es fa amb aquestes perquè res salti mentre llegeix
 };
 const desarVistes = () => guardat.posar('reshi-vistes', [...estat.vistes]);
@@ -75,10 +71,9 @@ const llegir = (id) => {
 	desarVistes();
 };
 const refreshLlegides = () => (estat.llegidesAbans = new Set(estat.vistes));
-// el que surt del privat.json: abans només eren les notícies; ara, notícies i cartera
+// el que surt del privat.json: el "per què t'importa", les notes dels projectes i les llegides a l'ordinador
 const aplicar = (obert) => {
 	estat.personal = obert?.noticies ?? obert;
-	estat.cartera = obert?.cartera ?? null;
 	estat.projectes = obert?.projectes ?? null; // la nota de cada projecte de la vitrina (què ha fet, què falta)
 	for (const id of obert?.vistes ?? []) estat.vistes.add(id); // les que ja va llegir a l'ordinador
 	desarVistes();
@@ -96,14 +91,21 @@ async function obrir(codi) {
 	return JSON.parse(new TextDecoder().decode(clar));
 }
 
+// les de mercat i cripto viuen al Mercat, al costat dels preus; a Notícies, la resta
+const TEMES_MERCAT = ['mercat', 'cripto'];
+const meves = () => estat.dades.edicio.targetes.filter((t) => !TEMES_MERCAT.includes(t.tema));
 const targetesVisibles = () => {
 	const temes = FILTRES.find((f) => f.id === estat.filtre)?.temes;
-	return [...estat.dades.edicio.targetes].sort(ordre).filter((t) => !temes || temes.includes(t.tema));
+	return meves()
+		.sort(ordre)
+		.filter((t) => !temes || temes.includes(t.tema));
 };
+// el que passa el lector: les de Notícies o, si s'ha obert des del Mercat, les de mercat
+const llistaLector = () => (estat.lectorIds ? estat.lectorIds.map((id) => estat.dades.edicio.targetes.find((t) => t.id === id)).filter(Boolean) : targetesVisibles());
 // les ja llegides al final; les urgents d'entre setmana ("nova") primer, les més noves davant; després, per importància
 const ordre = (a, b) =>
 	Number(estat.llegidesAbans.has(a.id)) - Number(estat.llegidesAbans.has(b.id)) || (b.nova ?? '').localeCompare(a.nova ?? '') || b.punts - a.punts;
-const noves = () => estat.dades.edicio.targetes.filter((t) => !estat.vistes.has(t.id)).length;
+const noves = () => meves().filter((t) => !estat.vistes.has(t.id)).length;
 // "2026-10-26 08:35" -> "avui a les 08:35", "ahir a les...", "dilluns a les..."
 const quan = (s) => {
 	const d = new Date(s.replace(' ', 'T'));
@@ -125,19 +127,6 @@ const FLETXA = {bo: '↗', dolent: '↘', depen: '⇄'};
 const pastilla = (x, {petit = false, senseNom = false} = {}) =>
 	`<span class="pastilla-toca ${x.efecte}"><i>${FLETXA[x.efecte]}</i>${senseNom ? '' : `<b>${esc(NOMS_TOCA[x.actiu])}</b>`}${petit ? '' : `<span>${esc(x.que)}</span>`}</span>`;
 const toques = (t) => (t.toca?.length ? `<span class="toques">${t.toca.map((x) => pastilla(x, {petit: true})).join('')}</span>` : '');
-// les notícies de l'edició que toquen una cosa del mercat (les més importants primer)
-const enllacos = (actiu) =>
-	estat.dades.edicio.targetes
-		.flatMap((n) => (n.toca ?? []).filter((x) => x.actiu === actiu).map((x) => ({n, x})))
-		.sort((a, b) => b.n.punts - a.n.punts)
-		.slice(0, 3);
-const noticiesQueToquen = (actiu, senseNom = true) => {
-	const ll = enllacos(actiu);
-	return ll.length
-		? `<ul class="m-noticies">${ll.map(({n, x}) => `<li><button type="button" data-anar-noticia="${n.id}">${pastilla(x, {senseNom})}<span>${esc(n.titol)}</span></button></li>`).join('')}</ul>`
-		: '';
-};
-
 const etiqueta = (tema, nova) =>
 	`<span class="etiqueta" data-tema="${tema}">${icona(TEMES[tema].icona, 12)} ${TEMES[tema].nom}${nova ? `<em class="nou">Nou · ${esc(dataCurta(nova))}</em>` : ''}</span>`;
 
@@ -206,6 +195,11 @@ function vistaNoticies() {
 	<ul class="llista">${llegides.map((t, i) => fila(t, pendents.length + i)).join('')}</ul>`
 			: ''
 	}
+	${
+		e.targetes.length - meves().length
+			? `<button type="button" class="cap-mercat" data-vista="mercat">${icona('mercat', 14)} ${e.targetes.length - meves().length} notícies de mercat: són al Mercat, al costat dels preus</button>`
+			: ''
+	}
 	${votsPerPassar()}`;
 }
 
@@ -221,270 +215,154 @@ function votsPerPassar() {
 const textVots = () =>
 	['VOTS RESHI', ...Object.entries(estat.vots).map(([id, v]) => `${v > 0 ? '+1' : '-1'} ${id}`)].join(String.fromCharCode(10));
 
-// --- Mercat: la situació (xifrada), el mercat avui i el simulador ---
+// --- Mercat: com està la setmana, per què, la cartera de prova de Reshi i què pot passar (el mateix que a Reshi) ---
 const eur = (x) => `${Math.round(x).toLocaleString('ca-ES')} €`;
-const pct = (x, d = 1) => `${x > 0 ? '+' : ''}${x.toLocaleString('ca-ES', {maximumFractionDigits: d})} %`;
+const pct = (x) => {
+	const r = Math.round(x * 10) / 10; // si no s'ha mogut, "0 %", no "−0 %"
+	return `${r > 0 ? '+' : r < 0 ? '−' : ''}${Math.abs(r).toLocaleString('ca-ES', {maximumFractionDigits: 1})} %`;
+};
 const preu = (a) =>
-	a.moneda === 'EUR'
-		? `${a.preu.toLocaleString('ca-ES', {maximumFractionDigits: a.preu > 1000 ? 0 : 2})} €`
-		: a.id === 'eurusd'
-			? a.preu.toLocaleString('ca-ES', {minimumFractionDigits: 3, maximumFractionDigits: 3})
-			: `${a.preu.toLocaleString('ca-ES', {maximumFractionDigits: 2})} $`;
+	a.id === 'eurusd'
+		? a.preu.toLocaleString('ca-ES', {minimumFractionDigits: 3, maximumFractionDigits: 3})
+		: `${a.preu.toLocaleString('ca-ES', {maximumFractionDigits: a.preu > 1000 ? 0 : 2})} ${a.moneda === 'EUR' ? '€' : '$'}`;
 const linia = (serie, puja) => {
 	const min = Math.min(...serie);
 	const max = Math.max(...serie);
-	const pts = serie.map((v, i) => `${((i / (serie.length - 1)) * 100).toFixed(2)},${(36 - ((v - min) / (max - min || 1)) * 32 - 2).toFixed(2)}`).join(' ');
-	return `<svg class="m-linia ${puja ? 'puja' : 'baixa'}" viewBox="0 0 100 36" preserveAspectRatio="none" aria-hidden="true"><polygon points="0,36 ${pts} 100,36"/><polyline points="${pts}" vector-effect="non-scaling-stroke"/></svg>`;
+	const pts = serie.map((v, i) => `${((i / (serie.length - 1)) * 100).toFixed(2)},${(30 - ((v - min) / (max - min || 1)) * 26 - 2).toFixed(2)}`).join(' ');
+	return `<svg class="m-linia ${puja ? 'puja' : 'baixa'}" viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true"><polygon points="0,30 ${pts} 100,30"/><polyline points="${pts}" vector-effect="non-scaling-stroke"/></svg>`;
 };
-const canvi = (nom, v) => `<span class="m-canvi ${v > 0 ? 'puja' : v < 0 ? 'baixa' : ''}"><small>${nom}</small>${pct(v)}</span>`;
-const FINESTRES = [
-	{mesos: 36, nom: '3 anys'},
-	{mesos: 60, nom: '5 anys'},
-	{mesos: 0, nom: 'Des del 2018'},
-];
+const dataBarra = (s) => s.split('-').reverse().join('/');
+const diners = (x) => (x >= 1e6 ? `${Math.round(x / 1e6).toLocaleString('ca-ES')} M$` : `${Math.round(x / 1e3).toLocaleString('ca-ES')} mil $`);
 
-function calcularSim() {
-	const c = estat.cartera;
-	const s = estat.sim;
-	const historia = estat.dades.mercat.historia;
-	const anys = s.anys ?? c.objectiu.anys;
-	const aportacio = s.aportacio ?? c.aportacio;
-	const inici = Math.max(0, c.compte.saldo - c.matalas);
-	const compte = 100 - s.msci - s.btc - s.eth;
-	const base = {inici, aportacio, anys, interes: c.compte.interes_aviat, historia, finestra: s.finestra};
-	const r = simular({...base, pesos: {compte, msci: s.msci, btc: s.btc, eth: s.eth}});
-	const nomesCompte = simular({...base, pesos: {compte: 100, msci: 0, btc: 0, eth: 0}}).perAny.map((p) => p.normal);
-	return {r, nomesCompte, inici, anys, aportacio, compte};
+// un termòmetre de por: el de les cripto va de 0 a 100; el VIX (borsa) sol estar a 20, a 30 hi ha por i a 40, pànic
+function termo(nom, t, tipus) {
+	const pos = tipus === 'cripto' ? t.valor : Math.min(100, Math.max(0, 50 - (t.valor - 20) * 2.5));
+	const etiqueta = pos < 25 ? 'Molta por' : pos < 45 ? 'Por' : pos < 55 ? 'Neutral' : pos < 75 ? 'Confiança' : 'Eufòria';
+	return `<div class="m-termo"><span>${nom}</span><b>${etiqueta}</b><div class="m-termo-barra"><i style="left:${pos}%"></i></div>
+		<small>${tipus === 'cripto' ? `${t.valor} de 100` : `VIX ${t.valor.toLocaleString('ca-ES')}`}${t.fa_setmana != null ? ` · fa una setmana, ${t.fa_setmana.toLocaleString('ca-ES')}` : ''}</small></div>`;
 }
 
-function grafic({r, nomesCompte, inici}) {
-	const W = 340;
-	const H = 190;
-	const pad = {e: 44, d: 8, a: 10, b: 22};
-	const punts = [{any: 0, mal: inici, normal: inici, be: inici, aportat: inici}, ...r.perAny];
-	const maxY = Math.max(...r.perAny.map((p) => p.be), ...nomesCompte) * 1.05;
-	const x = (a) => pad.e + (a / r.perAny.length) * (W - pad.e - pad.d);
-	const y = (v) => pad.a + (1 - v / maxY) * (H - pad.a - pad.b);
-	const pas = maxY > 400000 ? 100000 : maxY > 150000 ? 50000 : maxY > 60000 ? 20000 : 10000;
-	const marques = Array.from({length: Math.floor(maxY / pas) + 1}, (_, i) => i * pas);
-	const linia = (vs) => vs.map(([a, v]) => `${x(a).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
-	return `<svg class="m-ventall" viewBox="0 0 ${W} ${H}" role="img" aria-label="Com podrien créixer els estalvis any a any">
-		${marques.map((v) => `<line x1="${pad.e}" x2="${W - pad.d}" y1="${y(v)}" y2="${y(v)}" class="m-reixa"/><text x="${pad.e - 6}" y="${y(v) + 4}" text-anchor="end" class="m-eix">${v ? `${v / 1000}k` : '0'}</text>`).join('')}
-		${punts.map((p) => `<text x="${x(p.any)}" y="${H - 6}" text-anchor="middle" class="m-eix">${p.any}</text>`).join('')}
-		<polygon class="m-franja" points="${linia([...punts.map((p) => [p.any, p.be]), ...[...punts].reverse().map((p) => [p.any, p.mal])])}"/>
-		<polyline class="m-aportat" points="${linia(punts.map((p) => [p.any, p.aportat]))}"/>
-		<polyline class="m-compte" points="${linia([inici, ...nomesCompte].map((v, i) => [i, v]))}"/>
-		<polyline class="m-normal" points="${linia(punts.map((p) => [p.any, p.normal]))}"/>
-		<circle class="m-punt" cx="${x(punts.at(-1).any)}" cy="${y(punts.at(-1).normal)}" r="4.5"/>
-	</svg>`;
-}
-
-function resultatSim() {
-	const d = calcularSim();
-	const {r, nomesCompte, compte} = d;
-	const guany = r.final.normal - nomesCompte.at(-1);
-	return `<div class="m-tres">
-		<div><span>Si va malament</span><b>${eur(r.final.mal)}</b></div>
-		<div class="normal"><span>El normal</span><b>${eur(r.final.normal)}</b></div>
-		<div><span>Si va molt bé</span><b>${eur(r.final.be)}</b></div>
-	</div>
-	${grafic(d)}
-	<ul class="m-llegenda"><li class="l-franja">malament – molt bé</li><li class="l-normal">el normal</li><li class="l-compte">tot al compte</li><li class="l-aportat">el que hi poses</li></ul>
-	<ul class="m-frases">
-		<li>Hi hauràs posat <b>${eur(r.aportat)}</b>. Tot al compte en tindries uns <b>${eur(nomesCompte.at(-1))}</b>${
-			compte < 100 ? `; amb aquesta barreja, el normal seria <b class="${guany >= 0 ? 'puja' : 'baixa'}">${guany >= 0 ? '+' : '−'}${eur(Math.abs(guany))}</b> més.` : '.'
-		}</li>
-		${
-			compte < 100
-				? `<li>En <b>${Math.round(r.perdre * 100)} de cada 100</b> camins acabes amb menys del que hi has posat.</li>
-		<li>En un mal moment podries veure-ho baixar un <b>${Math.round(r.caiguda.dolenta * 100)} %</b> (uns ${eur(r.caiguda.dolentaEur)}). Aguantaries sense vendre?</li>`
-				: ''
-		}
-	</ul>
-	<p class="m-peu">2.000 camins barrejant mesos reals des de ${r.desDe.slice(5)}/${r.desDe.slice(0, 4)}. Canvia el període i mira com canvia tot: el futur no es repetirà igual. No és cap previsió ni cap consell.</p>`;
-}
-
-// --- Començar a invertir: la guia, què ha passat quan ha caigut i tot de cop o a poc a poc (mobil/escenaris.js) ---
-const ACTIUS_INV = [
-	{id: 'msci', nom: 'MSCI World', minim: 10},
-	{id: 'btc', nom: 'Bitcoin', minim: 40},
-	{id: 'eth', nom: 'Ethereum', minim: 40},
-];
-const MESOS_CURTS = ['gen.', 'febr.', 'març', 'abr.', 'maig', 'juny', 'jul.', 'ag.', 'set.', 'oct.', 'nov.', 'des.'];
-const mesAny = (ym) => `${MESOS_CURTS[Number(ym.slice(5, 7)) - 1]} ${ym.slice(0, 4)}`;
-const durada = (m) => (m < 12 ? `${m} ${m === 1 ? 'mes' : 'mesos'}` : m % 12 === 0 ? `${m / 12} ${m === 12 ? 'any' : 'anys'}` : `${(m / 12).toLocaleString('ca-ES', {maximumFractionDigits: 1})} anys`);
-const triarActiu = (camp) =>
-	`<div class="m-finestres">${ACTIUS_INV.map((a) => `<button type="button" data-inv-actiu="${camp}:${a.id}" aria-pressed="${estat.inv[camp] === a.id}">${a.nom}</button>`).join('')}</div>`;
-
-function resultatSiBaixa() {
-	const v = estat.inv;
-	const serie = estat.dades.mercat.series[v.siBaixa];
-	const nom = ACTIUS_INV.find((a) => a.id === v.siBaixa).nom;
-	const llista = caigudes(serie, v.minim / 100, v.siBaixa);
-	const pitjor = llista.reduce((p, x) => (!p || x.caiguda > p.caiguda ? x : p), null);
-	const desDe = serie[0][0].slice(0, 4);
-	return `<p class="inv-impacte">Una caiguda del ${v.minim} % vol dir que <b>${eur(v.capital)}</b> es queden en <b class="baixa">${eur(v.capital * (1 - v.minim / 100))}</b>.</p>
-	<p class="m-explica">${
-		llista.length
-			? `Des del ${desDe}, el ${nom} ha caigut més d’un ${v.minim} % <b>${llista.length} ${llista.length === 1 ? 'vegada' : 'vegades'}</b>. La pitjor, un <b class="baixa">−${Math.round(pitjor.caiguda * 100)} %</b>${pitjor.nom ? ` (${esc(pitjor.nom)})` : ''}.`
-			: `Des del ${desDe}, el ${nom} no ha caigut mai més d’un ${v.minim} % (mirant els preus de final de mes).`
-	}</p>
-	<ol class="inv-caigudes">${[...llista]
-		.reverse()
-		.map((x) => {
-			const aportant = v.mensual > 0 ? mesosFinsEnPositiu(serie, x.iPic, x.iFons, v.capital, v.mensual) : null;
-			return `<li>
-		<div class="inv-caiguda-cap"><b class="baixa">−${Math.round(x.caiguda * 100)} %</b><span>${x.nom ? `<strong>${esc(x.nom)}</strong>` : ''}<small>${mesAny(x.pic)} → ${mesAny(x.fons)}</small></span></div>
-		<div class="inv-barra"><i style="width:${x.caiguda * 100}%"></i></div>
-		<p>${x.mesosRecuperar !== null ? `Va trigar <b>${durada(x.mesosRecuperar)}</b> a tornar on era.` : '<b>Encara no ha tornat</b> on era.'}${
-			v.mensual > 0
-				? aportant !== null
-					? ` Posant ${eur(v.mensual)} cada mes, hauries tornat a guanyar en <b class="puja">${durada(aportant)}</b>.`
-					: ` Posant ${eur(v.mensual)} cada mes, encara no estaries en positiu.`
-				: ''
-		}</p>
-	</li>`;
-		})
-		.join('')}</ol>`;
-}
-
-function vistaInvertir() {
-	const m = estat.dades.mercat;
-	if (!m?.series) return '';
-	const v = estat.inv;
-	const guia = `<section class="m-bloc">
-		<h2 class="etiqueta">${icona('noticies', 12)} Abans de començar</h2>
-		<div class="inv-guia">${GUIA.map(
-			(g, i) => `<article class="inv-pas"><span class="inv-num">${i + 1}</span><b class="inv-xifra">${esc(g.xifra)}</b><h3>${esc(g.titol)}</h3><p>${esc(g.text)}</p>${
-				g.fonts.length ? `<footer class="fonts">${g.fonts.map((f) => `<a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.nom)} ${icona('fletxa', 12)}</a>`).join('')}</footer>` : ''
-			}</article>`,
-		).join('')}</div>
-		<p class="m-peu">Informació general comprovada l’${COMPROVAT}: mira-ho a la web de cada lloc abans de fer res. Reshi no et diu què has de fer.</p>
-	</section>`;
-	const siBaixa = `<section class="m-bloc m-sim inv-bloc">
-		<h2 class="etiqueta">${icona('mercat', 12)} Si baixa… què ha passat altres vegades?</h2>
-		${triarActiu('siBaixa')}
-		<label class="m-ll" for="inv-minim"><span><b>Caigudes de més d’un</b><small>des del punt més alt</small></span><input id="inv-minim" type="range" min="10" max="80" step="5" value="${v.minim}" data-inv="minim"><output id="out-inv-minim">${v.minim} %</output></label>
-		<label class="m-ll" for="inv-capital"><span><b>Si hi tinguessis</b><small>euros</small></span><input id="inv-capital" type="range" min="100" max="10000" step="100" value="${v.capital}" data-inv="capital"><output id="out-inv-capital">${eur(v.capital)}</output></label>
-		<label class="m-ll" for="inv-mensual"><span><b>I hi posessis cada mes</b><small>euros</small></span><input id="inv-mensual" type="range" min="0" max="1000" step="50" value="${v.mensual}" data-inv="mensual"><output id="out-inv-mensual">${eur(v.mensual)}</output></label>
-		<div id="inv-si-baixa" class="m-resultat">${resultatSiBaixa()}</div>
-		<p class="m-peu">Amb els preus de final de mes: dins del mes, les caigudes van ser una mica més fondes.${v.siBaixa === 'msci' ? ' Aquest fons existeix des del 2009: no hi surt la crisi del 2008, quan el MSCI World va perdre més de la meitat i va trigar uns cinc anys a recuperar-se.' : ''}</p>
-	</section>`;
-	let tot = '';
-	if (estat.cartera) {
-		const c = estat.cartera;
-		const capital = Math.max(0, c.compte.saldo - c.matalas);
-		const r = totDeCop(m.series[v.totCop], capital, 12, v.anys * 12);
-		const col = (titol, mitjana, pitjor, inici, perd) => `<div><h3>${titol}</h3><dl>
-			<dt>De mitjana acabes amb</dt><dd>${eur(mitjana)}</dd>
-			<dt>El pitjor moment per començar</dt><dd>${eur(pitjor)}<small>${mesAny(inici)}</small></dd>
-			<dt>Vegades que acabes perdent</dt><dd class="${perd ? 'baixa' : 'puja'}">${Math.round(perd * 100)} de 100</dd></dl></div>`;
-		tot = `<section class="m-bloc m-sim inv-bloc">
-		<h2 class="etiqueta">${icona('calculadora', 12)} ${eur(capital)}: tot de cop o en 12 mesos?</h2>
-		${triarActiu('totCop')}
-		<div class="m-finestres">${[3, 5, 7].map((a) => `<button type="button" data-inv-anys="${a}" aria-pressed="${v.anys === a}">${a} anys</button>`).join('')}</div>
-		${
-			r
-				? `<p class="m-explica">Mirant els ${r.casos} mesos en què hauries pogut començar des del ${mesAny(r.desDe)}, posar-ho <b>tot de cop</b> va acabar millor <b>${Math.round(r.guanyaCop * 100)} de cada 100 vegades</b>. Repartir-ho et protegeix de començar just abans d’una caiguda.</p>
-		<div class="inv-dos">${col('Tot de cop', r.mitjanaCop, r.pitjorCop.cop, r.pitjorCop.inici, r.perdCop)}${col('En 12 mesos', r.mitjanaPoc, r.pitjorPoc.poc, r.pitjorPoc.inici, r.perdPoc)}</div>`
-				: `<p class="m-explica">No hi ha prou història per mirar ${v.anys} anys enrere.</p>`
-		}
-		<p class="m-peu">Només els diners que ja tens, menys el matalàs, sense comptar el que estalvies cada mes ni els impostos. El passat no es repetirà igual.</p>
-	</section>`;
-	}
-	return `<header class="cap inv-cap"><span class="sobre">Començar a invertir</span><h1>Abans de moure res</h1><p>Què cal saber, què ha passat les altres vegades que ha caigut i què hauria passat amb els teus diners.</p></header>
-	${guia}${siBaixa}${tot}`;
-}
+// les notícies de mercat, en l'ordre de les causes i després la resta: el lector les passa des d'aquí
+const idsMercat = () => {
+	const s = estat.dades.setmana;
+	const delsMotius = (s?.causes ?? []).map((x) => x.noticia).filter(Boolean);
+	const altres = estat.dades.edicio.targetes.filter((t) => TEMES_MERCAT.includes(t.tema) && !delsMotius.includes(t.id)).map((t) => t.id);
+	return [...delsMotius, ...altres].filter((id) => estat.dades.edicio.targetes.some((t) => t.id === id));
+};
+const filaNoticia = (t) => `<button type="button" class="m-noticia" data-noticia-mercat="${t.id}">
+		${foto(t, 'fila-foto')}<span class="fila-text">${etiqueta(t.tema, t.nova)}<b>${esc(t.titol)}</b>${xifra(t)}</span>
+	</button>`;
 
 function vistaMercat() {
 	const m = estat.dades.mercat;
-	const c = estat.cartera;
-	const s = estat.sim;
-	const situacio = c
-		? `<section class="m-situacio">
-		<div class="gran"><b>${eur(c.compte.saldo)}</b><span>a ${esc(c.compte.nom)}</span></div>
-		<div><b>${c.compte.interes} % → ${c.compte.interes_aviat} %</b><span>el que et paga, d’aquí poc</span></div>
-		<div><b>${eur(c.aportacio)}</b><span>que estalvies al mes</span></div>
-		<div><b>${eur(c.matalas)}</b><span>de matalàs</span></div>
-		<div><b>${c.objectiu.anys} anys</b><span>fins a ${esc(c.objectiu.nom.toLowerCase())}</span></div>
-		${
-			enllacos('compte').length || enllacos('casa').length
-				? `<div class="m-toca-tens"><h3>Aquesta setmana toca el que tens</h3>${noticiesQueToquen('compte', false)}${noticiesQueToquen('casa', false)}</div>`
-				: ''
-		}
-		<p>Al compte, el ${c.compte.interes_aviat} % són uns <b>${eur((c.compte.saldo * c.compte.interes_aviat) / 100)} l’any</b>. Amb la inflació al voltant del 3 %, els diners guardats perden una mica de valor cada any.</p>
-	</section>`
-		: formCodi('La teva situació i el simulador', 'Posa el codi per veure els teus números i simular on posar els estalvis.');
-	const actius = m
+	const s = estat.dades.setmana;
+	const c = estat.dades.cartera_prova;
+	if (!m) return '<p class="buit">Encara no hi ha dades del mercat.</p>';
+	const noticia = (id) => estat.dades.edicio.targetes.find((t) => t.id === id);
+	const comEsta = `<section class="m-resum">
+		<span class="etiqueta">${icona('mercat', 12)} Aquesta setmana${s?.to ? `<em>${esc(s.to)}</em>` : ''}</span>
+		<p>${esc(s?.resum ?? 'Encara no hi ha l’anàlisi d’aquesta setmana.')}</p>
+	</section>
+	${m.termometres ? `<div class="m-termos">${m.termometres.borsa ? termo('Borsa', m.termometres.borsa, 'borsa') : ''}${m.termometres.cripto ? termo('Cripto', m.termometres.cripto, 'cripto') : ''}</div>` : ''}
+	<div class="m-actius">${m.actius
+		.map(
+			(a) => `<article class="m-actiu">
+		<header><b>${esc(a.nom)}</b><span class="m-setmana ${a.canvis.setmana > 0 ? 'puja' : a.canvis.setmana < 0 ? 'baixa' : ''}">${a.canvis.setmana >= 0 ? '↗' : '↘'} ${pct(a.canvis.setmana)}</span></header>
+		<span class="m-preu">${preu(a)}</span>
+		${linia(a.serie, a.canvis.mes >= 0)}
+		${s?.actius?.[a.id] ? `<p>${esc(s.actius[a.id])}</p>` : ''}
+		<small class="m-mes">Un mes: ${pct(a.canvis.mes)}</small>
+	</article>`,
+		)
+		.join('')}
+		${m.tipus_bce !== undefined ? `<article class="m-actiu m-bce"><header><b>Tipus del BCE</b></header><span class="m-preu">${m.tipus_bce.toLocaleString('ca-ES', {minimumFractionDigits: 2})} %</span>${s?.actius?.compte ? `<p>${esc(s.actius.compte)}</p>` : ''}</article>` : ''}
+	</div>
+	<p class="m-peu">Preus del ${dataBarra(m.actualitzat.slice(0, 10))} a les ${m.actualitzat.slice(11)}.</p>`;
+
+	const lligades = new Set((s?.causes ?? []).map((x) => x.noticia));
+	const altres = estat.dades.edicio.targetes.filter((t) => TEMES_MERCAT.includes(t.tema) && !lligades.has(t.id));
+	const perQue = s?.causes?.length
 		? `<section class="m-bloc">
-		<h2 class="etiqueta">${icona('mercat', 12)} El mercat <small>· ${esc(m.actualitzat?.slice(8, 10))}/${esc(m.actualitzat?.slice(5, 7))} ${esc(m.actualitzat?.slice(11))}</small></h2>
-		<div class="m-actius">${m.actius
-			.map(
-				(a) => `<article class="m-actiu">
-			<div class="m-actiu-cap"><b>${esc(a.nom)}</b><small>${esc(a.que)}</small></div>
-			<span class="m-preu">${preu(a)}</span>
-			${linia(a.serie, a.canvis.any >= 0)}
-			<div class="m-canvis">${canvi('setm.', a.canvis.setmana)}${canvi('mes', a.canvis.mes)}${canvi('any', a.canvis.any)}</div>
-			${{msci: 'msci', btc: 'btc', eth: 'eth', brent: 'butxaca'}[a.id] ? noticiesQueToquen({msci: 'msci', btc: 'btc', eth: 'eth', brent: 'butxaca'}[a.id], a.id !== 'brent') : ''}
-		</article>`,
-			)
-			.join('')}
-			${m.tipus_bce !== undefined ? `<article class="m-actiu m-bce"><div class="m-actiu-cap"><b>Tipus del BCE</b><small>D’aquí surt el que et paga el compte</small></div><span class="m-preu">${m.tipus_bce.toLocaleString('ca-ES', {minimumFractionDigits: 2})} %</span>${noticiesQueToquen('compte')}</article>` : ''}
+		<h2 class="m-titol">Per què està així</h2>
+		<ol class="m-causes">${s.causes
+			.map((x, i) => {
+				const n = noticia(x.noticia);
+				return `<li><span class="m-num">${i + 1}</span><div><h3>${esc(x.titol)}</h3><p>${esc(x.text)}</p>${n ? filaNoticia(n) : ''}</div></li>`;
+			})
+			.join('')}</ol>
+		${altres.length ? `<h3 class="etiqueta">${icona('noticies', 12)} Altres notícies de mercat</h3><div class="m-altres">${altres.map(filaNoticia).join('')}</div>` : ''}
+	</section>`
+		: '';
+
+	const signe = (x) => `${x >= 0 ? '+' : '−'}${eur(Math.abs(x))}`;
+	const cartera = c
+		? `<section class="m-bloc">
+		<h2 class="m-titol">La cartera de prova de Reshi <small>10.000 € ficticis que gestiono jo</small></h2>
+		<div class="m-cartera">
+			<div class="m-cartera-xifres">
+				<div><span>Val ara</span><b>${eur(c.valor)}</b><small class="${c.valor >= c.capital ? 'puja' : 'baixa'}">${signe(c.valor - c.capital)} des del ${dataBarra(c.inici)}</small></div>
+				${
+					c.comparar.valor != null
+						? `<div><span>Contra ${esc(c.comparar.nom)}</span><b class="${c.valor >= c.comparar.valor ? 'puja' : 'baixa'}">${signe(c.valor - c.comparar.valor)}</b><small>${c.valor >= c.comparar.valor ? 'de moment ho faig millor que el fons sol' : 'de moment el fons sol ho faria millor'}</small></div>`
+						: ''
+				}
+			</div>
+			<ul class="m-posicions">${c.posicions
+				.filter((x) => x.estat === 'oberta')
+				.map(
+					(x) => `<li><header><b>${esc(x.nom)}</b><span>${eur(x.import)} → <strong>${eur(x.valor)}</strong></span><em class="${x.valor >= x.import ? 'puja' : 'baixa'}">${pct((x.valor / x.import - 1) * 100)}</em></header>
+				<p>${esc(x.per_que)}</p><p class="m-vigilem">Què vigilo: ${esc(x.vigilem)}</p></li>`,
+				)
+				.join('')}
+				<li><header><b>Reserva al compte</b><span>${eur(c.liquiditat.import)} → <strong>${eur(c.liquiditat.valor)}</strong></span><em class="puja">${c.liquiditat.interes} % l’any</em></header><p>${esc(c.liquiditat.per_que)}</p></li>
+			</ul>
+			<h3 class="etiqueta">Què he fet</h3>
+			<ol class="m-moviments">${[...c.moviments]
+				.reverse()
+				.map((x) => `<li><b>${dataBarra(x.data)}</b> ${esc(x.text)}</li>`)
+				.join('')}</ol>
 		</div>
 	</section>`
-		: '<p class="buit">Encara no hi ha preus del mercat.</p>';
-	const resum = m && c ? resumHistoria(m.historia, s.finestra) : null;
-	const ll = (k, nom) => `<label class="m-ll" for="sim-${k}">
-		<span><b>${nom}</b><small>${pct(resum[k].anual * 100)} l’any · pitjor mes ${pct(resum[k].pitjorMes * 100, 0)}</small></span>
-		<input id="sim-${k}" type="range" min="0" max="100" step="5" value="${s[k]}" data-sim="${k}"><output id="out-${k}">${s[k]} %</output>
-	</label>`;
-	const simulador =
-		m && c
-			? `<section class="m-bloc m-sim">
-		<h2 class="etiqueta">${icona('calculadora', 12)} Simulador: on poso els estalvis?</h2>
-		<div class="m-finestres">${FINESTRES.map((f) => `<button type="button" data-finestra="${f.mesos}" aria-pressed="${s.finestra === f.mesos}">${f.nom}</button>`).join('')}</div>
-		<p class="m-explica">Comences amb <b>${eur(Math.max(0, c.compte.saldo - c.matalas))}</b> (sense el matalàs) i cada mes hi afegeixes el que estalvies.</p>
-		<div class="m-ll compte"><span><b>Compte remunerat</b><small>${c.compte.interes_aviat} % l’any · no baixa mai</small></span><div class="m-barra"><i id="barra-compte" style="width:${100 - s.msci - s.btc - s.eth}%"></i></div><output id="out-compte">${100 - s.msci - s.btc - s.eth} %</output></div>
-		${ll('msci', 'MSCI World')}${ll('btc', 'Bitcoin')}${ll('eth', 'Ethereum')}
-		<label class="m-ll" for="sim-anys"><span><b>Anys</b><small>fins que necessites els diners</small></span><input id="sim-anys" type="range" min="1" max="15" value="${s.anys ?? c.objectiu.anys}" data-sim="anys"><output id="out-anys">${s.anys ?? c.objectiu.anys}</output></label>
-		<label class="m-ll" for="sim-aportacio"><span><b>Cada mes</b><small>el que hi afegeixes</small></span><input id="sim-aportacio" type="range" min="0" max="2000" step="50" value="${s.aportacio ?? c.aportacio}" data-sim="aportacio"><output id="out-aportacio">${eur(s.aportacio ?? c.aportacio)}</output></label>
-		<div id="sim-resultat" class="m-resultat">${resultatSim()}</div>
-	</section>`
-			: '';
-	return `<header class="cap">
-		<span class="sobre">Mercat</span>
-		<h1>Els teus diners</h1>
-		<p>Com està el mercat i què podria passar amb els teus estalvis. Reshi analitza i explica; la decisió és teva.</p>
-	</header>
-	${situacio}${actius}${simulador}${vistaInvertir()}`;
-}
+		: '';
 
-// moure un lliscador: només es refà el resultat, perquè el dit no perdi el lliscador
-document.addEventListener('input', (ev) => {
-	const inv = ev.target.dataset?.inv;
-	if (inv) {
-		estat.inv[inv] = Number(ev.target.value);
-		document.getElementById(`out-inv-${inv}`).textContent = inv === 'minim' ? `${estat.inv[inv]} %` : eur(estat.inv[inv]);
-		document.getElementById('inv-si-baixa').innerHTML = resultatSiBaixa();
-		return;
-	}
-	const k = ev.target.dataset?.sim;
-	if (!k) return;
-	const s = estat.sim;
-	let v = Number(ev.target.value);
-	if (['msci', 'btc', 'eth'].includes(k)) {
-		v = Math.min(v, 100 - (s.msci + s.btc + s.eth - s[k]));
-		ev.target.value = v;
-	}
-	s[k] = v;
-	guardat.posar('reshi-sim', s);
-	const out = document.getElementById(`out-${k}`);
-	if (out) out.textContent = k === 'aportacio' ? eur(v) : k === 'anys' ? String(v) : `${v} %`;
-	const compte = 100 - s.msci - s.btc - s.eth;
-	document.getElementById('out-compte').textContent = `${compte} %`;
-	document.getElementById('barra-compte').style.width = `${compte}%`;
-	document.getElementById('sim-resultat').innerHTML = resultatSim();
-});
+	const futur = s?.que_pot_passar?.length
+		? `<section class="m-bloc">
+		<h2 class="m-titol">Què pot passar</h2>
+		<ol class="m-futur">${s.que_pot_passar
+			.map((x) => {
+				const d = dia(x.data);
+				const pr = x.polymarket?.ara;
+				return `<li><span class="m-data"><small>${DIES_CURTS[d.getDay()]}</small><b>${d.getDate()}</b><small>${MESOS[d.getMonth()]}</small></span>
+			<div><h3>${esc(x.titol)}</h3>
+			${
+				pr
+					? `<a class="m-aposta" href="${esc(pr.url)}" target="_blank" rel="noopener"><span class="m-aposta-barra"><i style="width:${Math.round(pr.probabilitat * 100)}%"></i></span>
+				<span><b>${Math.round(pr.probabilitat * 100)} %</b> aposta ${esc(x.polymarket.text)}</span>
+				<small>Polymarket · ${diners(pr.volum)} apostats${pr.volum < 300000 ? ' · hi aposta poca gent: fiable a mitges' : ''}</small></a>`
+					: ''
+			}
+			<p><b>Si passa:</b> ${esc(x.si)}</p><p><b>Si no:</b> ${esc(x.si_no)}</p></div></li>`;
+			})
+			.join('')}</ol>
+		${
+			s.apostes?.some((x) => x.ara)
+				? `<ul class="m-apostes">${s.apostes
+						.filter((x) => x.ara)
+						.map((x) => `<li><a href="${esc(x.ara.url)}" target="_blank" rel="noopener"><b>${Math.round(x.ara.probabilitat * 100)} %</b> aposta ${esc(x.text)} <small>· ${diners(x.ara.volum)}</small></a></li>`)
+						.join('')}</ul>`
+				: ''
+		}
+		<p class="m-peu">Les probabilitats són el que hi aposta la gent amb diners de debò a Polymarket, no una previsió del Claude. Com més diners hi ha apostats, més s’hi pot confiar.</p>
+	</section>`
+		: '';
+
+	return `<header class="cap">
+		<span class="sobre">Mercat${s?.data ? ` · setmana del ${dataBarra(s.data)}` : ''}</span>
+		<h1>Com està el mercat</h1>
+	</header>
+	${comEsta}${perQue}${cartera}${futur}
+	<p class="m-peu">L’anàlisi es renova cada diumenge. Reshi analitza i explica: no és un assessor financer.</p>`;
+}
 
 function vistaVitrina() {
 	const v = estat.dades.vitrina;
@@ -570,7 +448,7 @@ function vistaProjecte() {
 }
 
 function vistaLector() {
-	const llista = targetesVisibles();
+	const llista = llistaLector();
 	return `<div class="lector" role="dialog" aria-modal="true" aria-label="Notícies">
 	<div class="lector-barra">
 		<button type="button" class="rodo" data-tancar aria-label="Tancar">${icona('tancar', 18)}</button>
@@ -642,8 +520,8 @@ function pintar() {
 			const i = Math.round(pistes.scrollLeft / pistes.clientWidth);
 			if (i === estat.lector) return;
 			estat.lector = i;
-			llegir(targetesVisibles()[i].id);
-			document.getElementById('compte').textContent = `${i + 1} / ${targetesVisibles().length}`;
+			llegir(llistaLector()[i].id);
+			document.getElementById('compte').textContent = `${i + 1} / ${llistaLector().length}`;
 			document.querySelectorAll('.lector-punts i').forEach((p, j) => p.classList.toggle('ara', j === i));
 		});
 	}
@@ -651,13 +529,14 @@ function pintar() {
 
 function obrirLector(i) {
 	estat.lector = i;
-	llegir(targetesVisibles()[i].id);
+	llegir(llistaLector()[i].id);
 	history.pushState({lector: true}, ''); // el botó d'enrere del mòbil tanca el lector en lloc de sortir de l'app
 	pintar();
 }
 function tancarLector() {
 	if (estat.lector === null) return;
 	estat.lector = null;
+	estat.lectorIds = null;
 	refreshLlegides(); // les que acaba de llegir baixen a "Ja llegides"
 	pintar();
 }
@@ -676,13 +555,10 @@ document.addEventListener('click', (ev) => {
 		refreshLlegides();
 		pintar();
 		window.scrollTo(0, 0);
-	} else if (b.dataset.anarNoticia) {
-		estat.vista = 'noticies';
-		estat.filtre = 'totes';
-		refreshLlegides();
-		const i = targetesVisibles().findIndex((t) => t.id === b.dataset.anarNoticia);
-		pintar();
-		if (i >= 0) obrirLector(i);
+	} else if (b.dataset.noticiaMercat) {
+		// des del Mercat: el lector passa les notícies de mercat, començant per la clicada
+		estat.lectorIds = idsMercat();
+		obrirLector(Math.max(0, estat.lectorIds.indexOf(b.dataset.noticiaMercat)));
 	} else if (b.hasAttribute('data-llegir-totes')) {
 		for (const t of estat.dades.edicio.targetes) estat.vistes.add(t.id);
 		desarVistes();
@@ -694,18 +570,6 @@ document.addEventListener('click', (ev) => {
 		if (!obert) history.pushState({projecte: true}, ''); // el botó d'enrere torna a la vitrina
 		pintar();
 		document.querySelector('.fitxa')?.scrollTo(0, 0);
-	} else if (b.dataset.invActiu) {
-		const [camp, id] = b.dataset.invActiu.split(':');
-		estat.inv[camp] = id;
-		if (camp === 'siBaixa') estat.inv.minim = ACTIUS_INV.find((a) => a.id === id).minim;
-		pintar();
-	} else if (b.dataset.invAnys) {
-		estat.inv.anys = Number(b.dataset.invAnys);
-		pintar();
-	} else if (b.dataset.finestra !== undefined) {
-		estat.sim.finestra = Number(b.dataset.finestra);
-		guardat.posar('reshi-sim', estat.sim);
-		pintar();
 	} else if (b.dataset.filtre) {
 		estat.filtre = b.dataset.filtre;
 		pintar();
