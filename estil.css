@@ -20,6 +20,10 @@
 }
 /* cada tema té el seu color: el daurat queda per a la tecnologia i per al que va per tu */
 [data-tema='politica'] { --c: #7aa2f7; }
+[data-tema='ciencia'] { --c: #67e8f9; }
+[data-tema='crear'] { --c: #f0a35e; }
+[data-tema='reus'] { --c: #f472b6; }
+[data-tema='gadgets'] { --c: var(--or); }
 [data-tema='mercat'], [data-tema='cripto'] { --c: #4ade80; }
 [data-tema='conflictes'] { --c: #f0716a; }
 [data-tema='jocs'], [data-tema='ofertes'] { --c: #c792ea; }

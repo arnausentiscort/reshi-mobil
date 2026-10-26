@@ -5,20 +5,27 @@
 import {ICONES} from './icones.js';
 
 const TEMES = {
+	ciencia: {nom: 'Ciència i espai', icona: 'telescopi'},
+	crear: {nom: 'Per crear', icona: 'vareta'},
+	reus: {nom: 'Reus i el Camp', icona: 'ciutat'},
 	politica: {nom: 'Política', icona: 'politica'},
 	mercat: {nom: 'Mercat', icona: 'mercat'},
 	cripto: {nom: 'Cripto', icona: 'cripto'},
 	conflictes: {nom: 'Món', icona: 'conflictes'},
 	tecnologia: {nom: 'Tecnologia', icona: 'tecnologia'},
+	gadgets: {nom: 'Gadgets', icona: 'mobil'},
 	jocs: {nom: 'Jocs', icona: 'jocs'},
 	ofertes: {nom: 'Ofertes', icona: 'ofertes'},
 	eina: {nom: 'Eina de la setmana', icona: 'eina'},
 };
 const FILTRES = [
 	{id: 'totes', nom: 'Totes', temes: null},
+	{id: 'ciencia', nom: 'Ciència i espai', temes: ['ciencia']},
+	{id: 'crear', nom: 'Per crear', temes: ['crear', 'eina']},
+	{id: 'reus', nom: 'Reus', temes: ['reus']},
+	{id: 'tecnologia', nom: 'Tecnologia', temes: ['tecnologia', 'gadgets']},
 	{id: 'politica', nom: 'Política', temes: ['politica']},
 	{id: 'mon', nom: 'Món', temes: ['conflictes']},
-	{id: 'tecnologia', nom: 'Tecnologia', temes: ['tecnologia', 'eina']},
 	{id: 'jocs', nom: 'Jocs', temes: ['jocs', 'ofertes']},
 ];
 const PLACA = {fet: 'Acabat', 'en curs': 'En marxa', aturat: 'Per acabar', idea: 'Idea'};
