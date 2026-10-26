@@ -368,7 +368,7 @@ function vistaVitrina() {
 	<div class="vitrina">${v
 		.map(
 			(p) => `<article class="trofeu">
-		<span class="medalla">${p.foto ? `<img src="portadas/${esc(p.foto)}" alt="">` : icona(p.icona, 30)}</span>
+		<span class="medalla">${icona(p.icona, 30)}</span>
 		<span class="placa">${esc(PLACA[p.estat] ?? p.estat)}</span>
 		<h2>${esc(p.titol)}</h2>
 		<p>${esc(p.resum)}</p>
