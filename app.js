@@ -308,6 +308,7 @@ function vistaMercat() {
 		<div class="m-cartera">
 			<div class="m-cartera-xifres">
 				<div><span>Val ara</span><b>${eur(c.valor)}</b><small class="${c.valor >= c.capital ? 'puja' : 'baixa'}">${signe(c.valor - c.capital)} des del ${dataBarra(c.inici)}</small></div>
+				<div><span>Si ho vengués tot avui</span><b class="${c.net >= c.capital ? 'puja' : 'baixa'}">${eur(c.net)}</b><small>després de comissions i impostos</small></div>
 				${
 					c.comparar.valor != null
 						? `<div><span>Contra ${esc(c.comparar.nom)}</span><b class="${c.valor >= c.comparar.valor ? 'puja' : 'baixa'}">${signe(c.valor - c.comparar.valor)}</b><small>${c.valor >= c.comparar.valor ? 'de moment ho faig millor que el fons sol' : 'de moment el fons sol ho faria millor'}</small></div>`
@@ -318,13 +319,57 @@ function vistaMercat() {
 				.filter((x) => x.estat === 'oberta')
 				.map(
 					(x) => `<li><header><b>${esc(x.nom)}</b><span>${eur(x.import)} → <strong>${eur(x.valor)}</strong></span><em class="${x.valor >= x.import ? 'puja' : 'baixa'}">${pct((x.valor / x.import - 1) * 100)}</em></header>
-				<p>${esc(x.per_que)}</p><p class="m-vigilem">Què vigilo: ${esc(x.vigilem)}</p></li>`,
+				<p>${esc(x.per_que)}</p><p class="m-vigilem">Què vigilo: ${esc(x.vigilem)}${x.net != null ? ` · Si la vengués avui, en quedarien ${eur(x.net)}.` : ''}</p></li>`,
 				)
 				.join('')}
 				<li><header><b>Reserva al compte</b><span>${eur(c.liquiditat.import)} → <strong>${eur(c.liquiditat.valor)}</strong></span><em class="puja">${c.liquiditat.interes} % l’any</em></header><p>${esc(c.liquiditat.per_que)}</p></li>
 			</ul>
+			<p class="m-costos">${esc(c.costos.explica)}</p>
 			<h3 class="etiqueta">Què he fet</h3>
 			<ol class="m-moviments">${[...c.moviments]
+				.reverse()
+				.map((x) => `<li><b>${dataBarra(x.data)}</b> ${esc(x.text)}</li>`)
+				.join('')}</ol>
+		</div>
+	</section>`
+		: '';
+
+	const ap = estat.dades.apostes;
+	const preuDe = (x, moneda) => `${x.toLocaleString('ca-ES', {maximumFractionDigits: 2})} ${moneda === 'USD' ? '$' : '€'}`;
+	const apostes = ap
+		? `<section class="m-bloc">
+		<h2 class="m-titol">Les apostes de Reshi <small>1.000 € ficticis, més risc: apostes abans que passi alguna cosa</small></h2>
+		<div class="m-cartera">
+			<div class="m-cartera-xifres">
+				<div><span>Val ara</span><b>${eur(ap.valor)}</b><small class="${ap.valor >= ap.capital ? 'puja' : 'baixa'}">${signe(ap.valor - ap.capital)} des del ${dataBarra(ap.inici)}</small></div>
+				<div><span>Si ho vengués tot avui</span><b class="${ap.net >= ap.capital ? 'puja' : 'baixa'}">${eur(ap.net)}</b><small>després de comissions i impostos</small></div>
+				<div><span>Encerts</span><b>${ap.tancades ? `${ap.encerts} de ${ap.tancades}` : '—'}</b><small>${ap.tancades ? 'apostes tancades que han sortit bé' : 'encara no se n’ha tancat cap'}</small></div>
+			</div>
+			<ul class="m-apostes-llista">${ap.apostes
+				.filter((x) => x.estat === 'oberta')
+				.map(
+					(x) => `<li>
+				<header><b>${esc(x.nom)}</b><em class="${(x.valor ?? x.import) >= x.import ? 'puja' : 'baixa'}">${eur(x.import)} → ${eur(x.valor ?? x.import)}</em></header>
+				<span class="m-esdeveniment">${icona('calendari', 12)} ${esc(x.esdeveniment)}</span>
+				<div class="m-cami"><span class="m-cami-barra"><i style="left:${(x.cami ?? 0.5) * 100}%"></i></span>
+					<span class="m-cami-etiquetes"><small class="baixa">${preuDe(x.stop, x.moneda)}</small><small>ara ${x.preu_ara ? preuDe(x.preu_ara, x.moneda) : '—'}</small><small class="puja">${preuDe(x.objectiu, x.moneda)}</small></span>
+					<span class="m-cami-etiquetes"><small>venc si baixa aquí</small><small>recullo guanys aquí</small></span></div>
+				<p>${esc(x.tesi)}</p>
+				<p class="m-vigilem">Entrada a ${preuDe(x.preu, x.moneda)} el ${dataBarra(x.data)} ·${x.net != null ? ` si la vengués avui, en quedarien ${eur(x.net)} ·` : ''} ${x.dies >= 0 ? `queden ${x.dies} dies` : `límit ${dataBarra(x.limit)}`}</p>
+			</li>`,
+				)
+				.join('')}</ul>
+			<p class="m-costos">${esc(ap.costos.explica)}</p>
+			${
+				ap.apostes.some((x) => x.estat === 'tancada')
+					? `<h3 class="etiqueta">Tancades</h3><ol class="m-moviments">${ap.apostes
+							.filter((x) => x.estat === 'tancada')
+							.map((x) => `<li><b class="${x.encert ? 'puja' : 'baixa'}">${x.encert ? '✓' : '✗'}</b> ${esc(x.nom)}: ${eur(x.import)} → ${eur(x.valor_sortida ?? x.import)}. ${esc(x.llico ?? '')}</li>`)
+							.join('')}</ol>`
+					: ''
+			}
+			<h3 class="etiqueta">Què he fet</h3>
+			<ol class="m-moviments">${[...ap.historial]
 				.reverse()
 				.map((x) => `<li><b>${dataBarra(x.data)}</b> ${esc(x.text)}</li>`)
 				.join('')}</ol>
@@ -367,7 +412,7 @@ function vistaMercat() {
 		<span class="sobre">Mercat${s?.data ? ` · setmana del ${dataBarra(s.data)}` : ''}</span>
 		<h1>Com està el mercat</h1>
 	</header>
-	${comEsta}${perQue}${cartera}${futur}
+	${comEsta}${perQue}${cartera}${apostes}${futur}
 	<p class="m-peu">L’anàlisi es renova cada diumenge. Reshi analitza i explica: no és un assessor financer.</p>`;
 }
 
