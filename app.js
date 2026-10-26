@@ -83,6 +83,7 @@ const refreshLlegides = () => (estat.llegidesAbans = new Set(estat.vistes));
 const aplicar = (obert) => {
 	estat.personal = obert?.noticies ?? obert;
 	estat.projectes = obert?.projectes ?? null; // la nota de cada projecte de la vitrina (què ha fet, què falta)
+	estat.diners = obert?.diners ?? null; // els seus diners de debò
 	for (const id of obert?.vistes ?? []) estat.vistes.add(id); // les que ja va llegir a l'ordinador
 	desarVistes();
 	refreshLlegides();
@@ -314,6 +315,46 @@ function dinsMsci(d, setmanaFons) {
 	</section>`;
 }
 
+// els seus diners de debò: el compte i el pla, amb les compres estimades fins que n'hi ha la real
+function dinersMeus() {
+	const d = estat.diners;
+	if (!d) return estat.personal ? '' : formCodi('Els teus diners', 'Posa el codi per veure el que tens de debò al compte i invertit.');
+	const invertit = d.inversions.reduce((t, i) => t + i.valor, 0);
+	const aportat = d.inversions.reduce((t, i) => t + i.aportat, 0);
+	const guany = invertit - aportat - d.inversions.reduce((t, i) => t + i.saveback, 0);
+	return `<section class="m-bloc">
+		<h2 class="m-titol">Els meus diners <small>el que tens de debò a ${esc(d.compte.nom)}</small></h2>
+		<div class="m-cartera m-dues m-meus">
+			<div class="m-col">
+				<div class="m-cartera-xifres">
+					<div><span>Tot plegat</span><b>${eur(d.total)}</b><small>al compte i invertit</small></div>
+					<div><span>Al compte</span><b>${eur(d.compte.saldo_ara)}</b><small>al ${d.compte.interes.toLocaleString('ca-ES')} %: uns ${eur(d.compte.interessos_any)} l’any nets</small></div>
+					<div><span>Invertit</span><b>${eur(invertit)}</b><small class="${!aportat ? '' : guany >= 0 ? 'puja' : 'baixa'}">${aportat ? `${signeDiners(guany)} sobre el que hi has posat` : 'encara no ha començat'}</small></div>
+				</div>
+				${invertit > 0 ? repartiment([...d.inversions.filter((i) => i.valor > 0).map((i, k) => ({nom: i.nom, valor: i.valor, color: COLORS_PARTS[k % COLORS_PARTS.length]})), {nom: 'Al compte', valor: d.compte.saldo_ara, color: COLOR_RESERVA}]) : ''}
+				<p class="m-costos">El saldo és el del ${dataBarra(d.compte.data)}, menys el que en treu el pla i més els interessos (ja sense el 19 % d’Hisenda). La nòmina que hi entra no la sé: dis-m’ho i el poso al dia.</p>
+			</div>
+			<ul class="m-posicions">${d.inversions
+				.map(
+					(i) => `<li><header><b>${esc(i.nom)}</b><span>${eur(i.import)} cada dia ${i.dia}</span><em class="m-proxima">Pròxima: ${dataBarra(i.proxima)}</em></header>
+				${
+					i.compres.length
+						? `<p>Hi has posat <b>${eur(i.aportat)}</b>${i.saveback ? ` (més ${eur(i.saveback)} de Saveback)` : ''} · ara valen <b>${eur(i.valor)}</b>; si les vengués avui, en quedarien ${eur(i.net)}.</p>
+				<div class="m-taula"><table class="m-compres"><thead><tr><th>Dia</th><th>Import</th><th>Preu</th><th>Part.</th><th></th></tr></thead><tbody>${[...i.compres]
+					.reverse()
+					.map(
+						(x) => `<tr><td>${dataBarra(x.data)}</td><td>${eur(x.import)}</td><td>${x.preu.toLocaleString('ca-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2})} €</td><td>${x.participacions.toLocaleString('ca-ES', {maximumFractionDigits: 3})}</td><td><em class="m-etiq ${x.saveback ? '' : x.estimada ? 'estimada' : 'real'}">${x.saveback ? 'Saveback' : x.estimada ? 'estimada' : 'real'}</em></td></tr>`,
+					)
+					.join('')}</tbody></table></div>`
+						: `<p>El pla comença el <b>${dataBarra(i.inici)}</b>: ${eur(i.import)} cada mes, sense comissió. ISIN ${esc(i.isin)}. També hi va a parar l’1 % del Saveback de la targeta.</p>`
+				}</li>`,
+				)
+				.join('')}</ul>
+		</div>
+	</section>`;
+}
+const signeDiners = (x) => `${x >= 0 ? '+' : '−'}${eur(Math.abs(x))}`;
+
 function vistaMercat() {
 	const m = estat.dades.mercat;
 	const s = estat.dades.setmana;
@@ -476,7 +517,7 @@ function vistaMercat() {
 		<span class="sobre">Mercat${s?.data ? ` · setmana del ${dataBarra(s.data)}` : ''}</span>
 		<h1>Com està el mercat</h1>
 	</header>
-	${comEsta}${perQue}${dinsMsci(estat.dades.msci, m.actius.find((x) => x.id === 'msci')?.canvis.setmana)}${cartera}${apostes}${futur}
+	${comEsta}${dinersMeus()}${perQue}${dinsMsci(estat.dades.msci, m.actius.find((x) => x.id === 'msci')?.canvis.setmana)}${cartera}${apostes}${futur}
 	<p class="m-peu">L’anàlisi es renova cada diumenge. Reshi analitza i explica: no és un assessor financer.</p>`;
 }
 
