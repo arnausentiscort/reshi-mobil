@@ -270,7 +270,7 @@ img { display: block; max-width: 100%; }
 /* ===== A l'ordinador (i tauletes grans): tota la pantalla, no una columna de mòbil =====
    Barra de dalt amb la marca i les pestanyes; notícies en graella; Mercat en columnes; el lector, una finestra al mig. */
 .rodo.pas { display: none; }
-@media (min-width: 900px) {
+@media (min-width: 760px) {
 	body { font-size: 15px; }
 	.marca { position: fixed; z-index: 6; inset: 0 0 auto; max-width: none; height: 60px; padding: 0 max(28px, calc((100% - 1240px) / 2 + 28px)); background: rgba(18, 18, 18, 0.92); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid var(--vora); }
 	.marca .obert { margin-left: 8px; }
