@@ -114,6 +114,25 @@ const foto = (t, classe) =>
 // la xifra que resumeix la notícia: grossa, en daurat
 const xifra = (t, classe = 'xifra') => (t.xifra ? `<span class="${classe}"><b>${esc(t.xifra.valor)}</b><span>${esc(t.xifra.que)}</span></span>` : '');
 
+// a què toca cada notícia: pastilla verda (bo per a qui ho té), vermella (dolent) o grisa (depèn)
+const NOMS_TOCA = {msci: 'MSCI World', btc: 'Bitcoin', eth: 'Ethereum', compte: 'El teu compte', casa: 'La casa', butxaca: 'La butxaca'};
+const FLETXA = {bo: '↗', dolent: '↘', depen: '⇄'};
+const pastilla = (x, {petit = false, senseNom = false} = {}) =>
+	`<span class="pastilla-toca ${x.efecte}"><i>${FLETXA[x.efecte]}</i>${senseNom ? '' : `<b>${esc(NOMS_TOCA[x.actiu])}</b>`}${petit ? '' : `<span>${esc(x.que)}</span>`}</span>`;
+const toques = (t) => (t.toca?.length ? `<span class="toques">${t.toca.map((x) => pastilla(x, {petit: true})).join('')}</span>` : '');
+// les notícies de l'edició que toquen una cosa del mercat (les més importants primer)
+const enllacos = (actiu) =>
+	estat.dades.edicio.targetes
+		.flatMap((n) => (n.toca ?? []).filter((x) => x.actiu === actiu).map((x) => ({n, x})))
+		.sort((a, b) => b.n.punts - a.n.punts)
+		.slice(0, 3);
+const noticiesQueToquen = (actiu, senseNom = true) => {
+	const ll = enllacos(actiu);
+	return ll.length
+		? `<ul class="m-noticies">${ll.map(({n, x}) => `<li><button type="button" data-anar-noticia="${n.id}">${pastilla(x, {senseNom})}<span>${esc(n.titol)}</span></button></li>`).join('')}</ul>`
+		: '';
+};
+
 const etiqueta = (tema, nova) =>
 	`<span class="etiqueta" data-tema="${tema}">${icona(TEMES[tema].icona, 12)} ${TEMES[tema].nom}${nova ? `<em class="nou">Nou · ${esc(dataCurta(nova))}</em>` : ''}</span>`;
 
@@ -137,7 +156,7 @@ function vistaNoticies() {
 	const n = noves();
 	const agenda = e.agenda.filter((a) => a.data >= avui);
 	const fila = (t, i) => `<li><button type="button" class="fila ${estat.vots[t.id] === -1 ? 'sobra' : ''} ${estat.vistes.has(t.id) ? 'vista' : ''}" data-obrir="${i}">
-		<span class="fila-text">${etiqueta(t.tema, t.nova)}<b>${esc(t.titol)}</b>${xifra(t)}</span>
+		<span class="fila-text">${etiqueta(t.tema, t.nova)}<b>${esc(t.titol)}</b>${xifra(t)}${toques(t)}</span>
 		${foto(t, 'fila-foto')}
 	</button></li>`;
 	return `
@@ -171,7 +190,7 @@ function vistaNoticies() {
 		primera
 			? `<button type="button" class="portada" data-obrir="0">
 		${foto(primera, 'portada-foto')}
-		<span class="portada-text">${etiqueta(primera.tema, primera.nova)}<h2>${esc(primera.titol)}</h2>${xifra(primera)}</span>
+		<span class="portada-text">${etiqueta(primera.tema, primera.nova)}<h2>${esc(primera.titol)}</h2>${xifra(primera)}${toques(primera)}</span>
 	</button>`
 			: ''
 	}
@@ -291,6 +310,11 @@ function vistaMercat() {
 		<div><b>${eur(c.aportacio)}</b><span>que estalvies al mes</span></div>
 		<div><b>${eur(c.matalas)}</b><span>de matalàs</span></div>
 		<div><b>${c.objectiu.anys} anys</b><span>fins a ${esc(c.objectiu.nom.toLowerCase())}</span></div>
+		${
+			enllacos('compte').length || enllacos('casa').length
+				? `<div class="m-toca-tens"><h3>Aquesta setmana toca el que tens</h3>${noticiesQueToquen('compte', false)}${noticiesQueToquen('casa', false)}</div>`
+				: ''
+		}
 		<p>Al compte, el ${c.compte.interes_aviat} % són uns <b>${eur((c.compte.saldo * c.compte.interes_aviat) / 100)} l’any</b>. Amb la inflació al voltant del 3 %, els diners guardats perden una mica de valor cada any.</p>
 	</section>`
 		: formCodi('La teva situació i el simulador', 'Posa el codi per veure els teus números i simular on posar els estalvis.');
@@ -304,10 +328,11 @@ function vistaMercat() {
 			<span class="m-preu">${preu(a)}</span>
 			${linia(a.serie, a.canvis.any >= 0)}
 			<div class="m-canvis">${canvi('setm.', a.canvis.setmana)}${canvi('mes', a.canvis.mes)}${canvi('any', a.canvis.any)}</div>
+			${{msci: 'msci', btc: 'btc', eth: 'eth', brent: 'butxaca'}[a.id] ? noticiesQueToquen({msci: 'msci', btc: 'btc', eth: 'eth', brent: 'butxaca'}[a.id], a.id !== 'brent') : ''}
 		</article>`,
 			)
 			.join('')}
-			${m.tipus_bce !== undefined ? `<article class="m-actiu m-bce"><div class="m-actiu-cap"><b>Tipus del BCE</b><small>D’aquí surt el que et paga el compte</small></div><span class="m-preu">${m.tipus_bce.toLocaleString('ca-ES', {minimumFractionDigits: 2})} %</span></article>` : ''}
+			${m.tipus_bce !== undefined ? `<article class="m-actiu m-bce"><div class="m-actiu-cap"><b>Tipus del BCE</b><small>D’aquí surt el que et paga el compte</small></div><span class="m-preu">${m.tipus_bce.toLocaleString('ca-ES', {minimumFractionDigits: 2})} %</span>${noticiesQueToquen('compte')}</article>` : ''}
 		</div>
 	</section>`
 		: '<p class="buit">Encara no hi ha preus del mercat.</p>';
@@ -384,6 +409,8 @@ function vistaLector() {
 	<div class="lector-barra">
 		<button type="button" class="rodo" data-tancar aria-label="Tancar">${icona('tancar', 18)}</button>
 		<span class="lector-compte" id="compte">${estat.lector + 1} / ${llista.length}</span>
+		<button type="button" class="rodo pas" data-pas="-1" aria-label="Notícia anterior">${icona('enrere', 18)}</button>
+		<button type="button" class="rodo pas" data-pas="1" aria-label="Notícia següent">${icona('endavant', 18)}</button>
 		<span class="lector-punts">${llista.map((_, i) => `<i class="${i === estat.lector ? 'ara' : ''}"></i>`).join('')}</span>
 	</div>
 	<div class="lector-pistes" id="pistes">${llista
@@ -404,6 +431,11 @@ function vistaLector() {
 					: `<section class="per-tu tancat"><h3>${icona('cadenat', 12)} Per què t’importa</h3><p>Posa el codi a la portada per veure-ho.</p></section>`
 			}
 			<section><h3>Què pot canviar</h3><p>${esc(t.que_canvia)}</p></section>
+			${
+				t.toca?.length
+					? `<section class="que-et-fa"><h3>Què li fa al que tens o mires</h3><ul>${t.toca.map((x) => `<li>${pastilla(x)}<p>${esc(x.per_que)}</p></li>`).join('')}</ul></section>`
+					: ''
+			}
 			<footer class="fonts">${t.fonts.map((f) => `<a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.nom)} ${icona('fletxa', 12)}</a>`).join('')}</footer>
 		</div>
 		<div class="vots">
@@ -472,6 +504,13 @@ document.addEventListener('click', (ev) => {
 		refreshLlegides();
 		pintar();
 		window.scrollTo(0, 0);
+	} else if (b.dataset.anarNoticia) {
+		estat.vista = 'noticies';
+		estat.filtre = 'totes';
+		refreshLlegides();
+		const i = targetesVisibles().findIndex((t) => t.id === b.dataset.anarNoticia);
+		pintar();
+		if (i >= 0) obrirLector(i);
 	} else if (b.hasAttribute('data-llegir-totes')) {
 		for (const t of estat.dades.edicio.targetes) estat.vistes.add(t.id);
 		desarVistes();
@@ -486,6 +525,9 @@ document.addEventListener('click', (ev) => {
 		pintar();
 	} else if (b.dataset.obrir !== undefined) {
 		obrirLector(Number(b.dataset.obrir));
+	} else if (b.dataset.pas) {
+		const pistes = document.getElementById('pistes');
+		pistes.scrollBy({left: Number(b.dataset.pas) * pistes.clientWidth, behavior: 'smooth'});
 	} else if (b.hasAttribute('data-tancar')) {
 		history.back();
 	} else if (b.hasAttribute('data-copiar-vots')) {
