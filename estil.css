@@ -149,3 +149,4 @@ img { display: block; max-width: 100%; }
 @media (prefers-reduced-motion: reduce) {
 	*, .lector { animation: none !important; transition: none !important; }
 }
+.nou { margin-left: 4px; padding: 2px 7px; border-radius: 6px; font-style: normal; font-size: 9.5px; letter-spacing: 0.08em; color: #1a1408; background: var(--or); }

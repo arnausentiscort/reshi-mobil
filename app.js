@@ -64,15 +64,18 @@ async function obrir(codi) {
 
 const targetesVisibles = () => {
 	const temes = FILTRES.find((f) => f.id === estat.filtre)?.temes;
-	return [...estat.dades.edicio.targetes].sort((a, b) => b.punts - a.punts).filter((t) => !temes || temes.includes(t.tema));
+	return [...estat.dades.edicio.targetes].sort(ordre).filter((t) => !temes || temes.includes(t.tema));
 };
+// les urgents d'entre setmana ("nova": el dia que van entrar) van primer, les més noves davant; després, per importància
+const ordre = (a, b) => (b.nova ?? '').localeCompare(a.nova ?? '') || b.punts - a.punts;
 
 const foto = (t, classe) =>
 	t.imatge
 		? `<span class="${classe}" data-tema="${t.tema}"><img src="${esc(t.imatge)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">${icona(TEMES[t.tema].icona, 28)}</span>`
 		: `<span class="${classe}" data-tema="${t.tema}">${icona(TEMES[t.tema].icona, 28)}</span>`;
 
-const etiqueta = (tema) => `<span class="etiqueta" data-tema="${tema}">${icona(TEMES[tema].icona, 12)} ${TEMES[tema].nom}</span>`;
+const etiqueta = (tema, nova) =>
+	`<span class="etiqueta" data-tema="${tema}">${icona(TEMES[tema].icona, 12)} ${TEMES[tema].nom}${nova ? `<em class="nou">Nou · ${esc(dataCurta(nova))}</em>` : ''}</span>`;
 
 function vistaNoticies() {
 	const e = estat.dades.edicio;
@@ -115,14 +118,14 @@ function vistaNoticies() {
 		primera
 			? `<button type="button" class="portada" data-obrir="0">
 		${foto(primera, 'portada-foto')}
-		<span class="portada-text">${etiqueta(primera.tema)}<h2>${esc(primera.titol)}</h2><p>${esc(primera.frase)}</p></span>
+		<span class="portada-text">${etiqueta(primera.tema, primera.nova)}<h2>${esc(primera.titol)}</h2><p>${esc(primera.frase)}</p></span>
 	</button>`
 			: ''
 	}
 	<ul class="llista">${resta
 		.map(
 			(t, i) => `<li><button type="button" class="fila ${estat.vots[t.id] === -1 ? 'sobra' : ''}" data-obrir="${i + 1}">
-		<span class="fila-text">${etiqueta(t.tema)}<b>${esc(t.titol)}</b><small>${esc(t.frase)}</small></span>
+		<span class="fila-text">${etiqueta(t.tema, t.nova)}<b>${esc(t.titol)}</b><small>${esc(t.frase)}</small></span>
 		${foto(t, 'fila-foto')}
 	</button></li>`,
 		)
@@ -165,7 +168,7 @@ function vistaLector() {
 			return `<article class="pagina" data-id="${t.id}">
 		${foto(t, 'pagina-foto')}
 		<div class="pagina-cos">
-			${etiqueta(t.tema)}
+			${etiqueta(t.tema, t.nova)}
 			<h2>${esc(t.titol)}</h2>
 			<p class="entradeta">${esc(t.frase)}</p>
 			<section><h3>Què passa</h3><p>${esc(t.que_passa)}</p></section>
