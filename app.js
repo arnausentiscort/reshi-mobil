@@ -1,7 +1,8 @@
-// Reshi al mòbil: les Notícies (amb la part personal xifrada) i la Vitrina. Sense llibreries: dades.json té l'edició
-// pública i la vitrina, privat.json el "per què t'importa" de cada notícia, xifrat. El codi es posa un cop i el mòbil el
-// recorda. Els vots, de moment, es guarden en aquest mòbil.
+// Reshi al mòbil: les Notícies, el Mercat i la Vitrina. Sense llibreries: dades.json té l'edició pública, els preus del
+// mercat i la vitrina; privat.json, xifrat, el "per què t'importa" de cada notícia i la situació de l'Arnau. El codi es
+// posa un cop i el mòbil el recorda. Els vots, de moment, es guarden en aquest mòbil.
 import {ICONES} from './icones.js';
+import {resumHistoria, simular} from './simulador.js';
 
 const TEMES = {
 	politica: {nom: 'Política', icona: 'politica'},
@@ -49,7 +50,23 @@ const guardat = {
 	},
 };
 
-const estat = {dades: null, vista: 'noticies', filtre: 'totes', personal: null, privat: null, vots: guardat.llegir('reshi-vots', {}), lector: null, error: null};
+const estat = {
+	dades: null,
+	vista: 'noticies',
+	filtre: 'totes',
+	personal: null,
+	cartera: null,
+	privat: null,
+	vots: guardat.llegir('reshi-vots', {}),
+	lector: null,
+	error: null,
+	sim: guardat.llegir('reshi-sim', {msci: 60, btc: 15, eth: 0, anys: null, aportacio: null, finestra: 60}),
+};
+// el que surt del privat.json: abans només eren les notícies; ara, notícies i cartera
+const aplicar = (obert) => {
+	estat.personal = obert?.noticies ?? obert;
+	estat.cartera = obert?.cartera ?? null;
+};
 
 // --- la part personal: PBKDF2 + AES-GCM, igual que web_mobil.py ---
 const deB64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
@@ -80,6 +97,16 @@ const xifra = (t, classe = 'xifra') => (t.xifra ? `<span class="${classe}"><b>${
 const etiqueta = (tema, nova) =>
 	`<span class="etiqueta" data-tema="${tema}">${icona(TEMES[tema].icona, 12)} ${TEMES[tema].nom}${nova ? `<em class="nou">Nou · ${esc(dataCurta(nova))}</em>` : ''}</span>`;
 
+const formCodi = (titol, text) => `<form class="cadenat" id="form-codi">
+		<span class="cadenat-icona">${icona('cadenat', 18)}</span>
+		<label for="codi"><b>${titol}</b><span>${text}</span></label>
+		<div class="cadenat-fila">
+			<input id="codi" name="codi" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX" maxlength="12">
+			<button type="submit">Obrir</button>
+		</div>
+		${estat.error ? `<p class="cadenat-error">${esc(estat.error)}</p>` : ''}
+	</form>`;
+
 function vistaNoticies() {
 	const e = estat.dades.edicio;
 	const avui = new Date().toISOString().slice(0, 10);
@@ -92,19 +119,7 @@ function vistaNoticies() {
 		<h1>${esc(e.titol)}</h1>
 		<p>${esc(e.intro)}</p>
 	</header>
-	${
-		estat.personal
-			? ''
-			: `<form class="cadenat" id="form-codi">
-		<span class="cadenat-icona">${icona('cadenat', 18)}</span>
-		<label for="codi"><b>La part que va per tu</b><span>Posa el codi i cada notícia et dirà per què t’importa. El mòbil el recordarà.</span></label>
-		<div class="cadenat-fila">
-			<input id="codi" name="codi" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX" maxlength="12">
-			<button type="submit">Obrir</button>
-		</div>
-		${estat.error ? `<p class="cadenat-error">${esc(estat.error)}</p>` : ''}
-	</form>`
-	}
+	${estat.personal ? '' : formCodi('La part que va per tu', 'Posa el codi i cada notícia et dirà per què t’importa. El mòbil el recordarà.')}
 	${
 		agenda.length
 			? `<section class="agenda" aria-label="Pròximament">
@@ -147,6 +162,166 @@ function votsPerPassar() {
 }
 const textVots = () =>
 	['VOTS RESHI', ...Object.entries(estat.vots).map(([id, v]) => `${v > 0 ? '+1' : '-1'} ${id}`)].join(String.fromCharCode(10));
+
+// --- Mercat: la situació (xifrada), el mercat avui i el simulador ---
+const eur = (x) => `${Math.round(x).toLocaleString('ca-ES')} €`;
+const pct = (x, d = 1) => `${x > 0 ? '+' : ''}${x.toLocaleString('ca-ES', {maximumFractionDigits: d})} %`;
+const preu = (a) =>
+	a.moneda === 'EUR'
+		? `${a.preu.toLocaleString('ca-ES', {maximumFractionDigits: a.preu > 1000 ? 0 : 2})} €`
+		: a.id === 'eurusd'
+			? a.preu.toLocaleString('ca-ES', {minimumFractionDigits: 3, maximumFractionDigits: 3})
+			: `${a.preu.toLocaleString('ca-ES', {maximumFractionDigits: 2})} $`;
+const linia = (serie, puja) => {
+	const min = Math.min(...serie);
+	const max = Math.max(...serie);
+	const pts = serie.map((v, i) => `${((i / (serie.length - 1)) * 100).toFixed(2)},${(36 - ((v - min) / (max - min || 1)) * 32 - 2).toFixed(2)}`).join(' ');
+	return `<svg class="m-linia ${puja ? 'puja' : 'baixa'}" viewBox="0 0 100 36" preserveAspectRatio="none" aria-hidden="true"><polygon points="0,36 ${pts} 100,36"/><polyline points="${pts}" vector-effect="non-scaling-stroke"/></svg>`;
+};
+const canvi = (nom, v) => `<span class="m-canvi ${v > 0 ? 'puja' : v < 0 ? 'baixa' : ''}"><small>${nom}</small>${pct(v)}</span>`;
+const FINESTRES = [
+	{mesos: 36, nom: '3 anys'},
+	{mesos: 60, nom: '5 anys'},
+	{mesos: 0, nom: 'Des del 2018'},
+];
+
+function calcularSim() {
+	const c = estat.cartera;
+	const s = estat.sim;
+	const historia = estat.dades.mercat.historia;
+	const anys = s.anys ?? c.objectiu.anys;
+	const aportacio = s.aportacio ?? c.aportacio;
+	const inici = Math.max(0, c.compte.saldo - c.matalas);
+	const compte = 100 - s.msci - s.btc - s.eth;
+	const base = {inici, aportacio, anys, interes: c.compte.interes_aviat, historia, finestra: s.finestra};
+	const r = simular({...base, pesos: {compte, msci: s.msci, btc: s.btc, eth: s.eth}});
+	const nomesCompte = simular({...base, pesos: {compte: 100, msci: 0, btc: 0, eth: 0}}).perAny.map((p) => p.normal);
+	return {r, nomesCompte, inici, anys, aportacio, compte};
+}
+
+function grafic({r, nomesCompte, inici}) {
+	const W = 340;
+	const H = 190;
+	const pad = {e: 44, d: 8, a: 10, b: 22};
+	const punts = [{any: 0, mal: inici, normal: inici, be: inici, aportat: inici}, ...r.perAny];
+	const maxY = Math.max(...r.perAny.map((p) => p.be), ...nomesCompte) * 1.05;
+	const x = (a) => pad.e + (a / r.perAny.length) * (W - pad.e - pad.d);
+	const y = (v) => pad.a + (1 - v / maxY) * (H - pad.a - pad.b);
+	const pas = maxY > 400000 ? 100000 : maxY > 150000 ? 50000 : maxY > 60000 ? 20000 : 10000;
+	const marques = Array.from({length: Math.floor(maxY / pas) + 1}, (_, i) => i * pas);
+	const linia = (vs) => vs.map(([a, v]) => `${x(a).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+	return `<svg class="m-ventall" viewBox="0 0 ${W} ${H}" role="img" aria-label="Com podrien créixer els estalvis any a any">
+		${marques.map((v) => `<line x1="${pad.e}" x2="${W - pad.d}" y1="${y(v)}" y2="${y(v)}" class="m-reixa"/><text x="${pad.e - 6}" y="${y(v) + 4}" text-anchor="end" class="m-eix">${v ? `${v / 1000}k` : '0'}</text>`).join('')}
+		${punts.map((p) => `<text x="${x(p.any)}" y="${H - 6}" text-anchor="middle" class="m-eix">${p.any}</text>`).join('')}
+		<polygon class="m-franja" points="${linia([...punts.map((p) => [p.any, p.be]), ...[...punts].reverse().map((p) => [p.any, p.mal])])}"/>
+		<polyline class="m-aportat" points="${linia(punts.map((p) => [p.any, p.aportat]))}"/>
+		<polyline class="m-compte" points="${linia([inici, ...nomesCompte].map((v, i) => [i, v]))}"/>
+		<polyline class="m-normal" points="${linia(punts.map((p) => [p.any, p.normal]))}"/>
+		<circle class="m-punt" cx="${x(punts.at(-1).any)}" cy="${y(punts.at(-1).normal)}" r="4.5"/>
+	</svg>`;
+}
+
+function resultatSim() {
+	const d = calcularSim();
+	const {r, nomesCompte, compte} = d;
+	const guany = r.final.normal - nomesCompte.at(-1);
+	return `<div class="m-tres">
+		<div><span>Si va malament</span><b>${eur(r.final.mal)}</b></div>
+		<div class="normal"><span>El normal</span><b>${eur(r.final.normal)}</b></div>
+		<div><span>Si va molt bé</span><b>${eur(r.final.be)}</b></div>
+	</div>
+	${grafic(d)}
+	<ul class="m-llegenda"><li class="l-franja">malament – molt bé</li><li class="l-normal">el normal</li><li class="l-compte">tot al compte</li><li class="l-aportat">el que hi poses</li></ul>
+	<ul class="m-frases">
+		<li>Hi hauràs posat <b>${eur(r.aportat)}</b>. Tot al compte en tindries uns <b>${eur(nomesCompte.at(-1))}</b>${
+			compte < 100 ? `; amb aquesta barreja, el normal seria <b class="${guany >= 0 ? 'puja' : 'baixa'}">${guany >= 0 ? '+' : '−'}${eur(Math.abs(guany))}</b> més.` : '.'
+		}</li>
+		${
+			compte < 100
+				? `<li>En <b>${Math.round(r.perdre * 100)} de cada 100</b> camins acabes amb menys del que hi has posat.</li>
+		<li>En un mal moment podries veure-ho baixar un <b>${Math.round(r.caiguda.dolenta * 100)} %</b> (uns ${eur(r.caiguda.dolentaEur)}). Aguantaries sense vendre?</li>`
+				: ''
+		}
+	</ul>
+	<p class="m-peu">2.000 camins barrejant mesos reals des de ${r.desDe.slice(5)}/${r.desDe.slice(0, 4)}. Canvia el període i mira com canvia tot: el futur no es repetirà igual. No és cap previsió ni cap consell.</p>`;
+}
+
+function vistaMercat() {
+	const m = estat.dades.mercat;
+	const c = estat.cartera;
+	const s = estat.sim;
+	const situacio = c
+		? `<section class="m-situacio">
+		<div class="gran"><b>${eur(c.compte.saldo)}</b><span>a ${esc(c.compte.nom)}</span></div>
+		<div><b>${c.compte.interes} % → ${c.compte.interes_aviat} %</b><span>el que et paga, d’aquí poc</span></div>
+		<div><b>${eur(c.aportacio)}</b><span>que estalvies al mes</span></div>
+		<div><b>${eur(c.matalas)}</b><span>de matalàs</span></div>
+		<div><b>${c.objectiu.anys} anys</b><span>fins a ${esc(c.objectiu.nom.toLowerCase())}</span></div>
+		<p>Al compte, el ${c.compte.interes_aviat} % són uns <b>${eur((c.compte.saldo * c.compte.interes_aviat) / 100)} l’any</b>. Amb la inflació al voltant del 3 %, els diners guardats perden una mica de valor cada any.</p>
+	</section>`
+		: formCodi('La teva situació i el simulador', 'Posa el codi per veure els teus números i simular on posar els estalvis.');
+	const actius = m
+		? `<section class="m-bloc">
+		<h2 class="etiqueta">${icona('mercat', 12)} El mercat <small>· ${esc(m.actualitzat?.slice(8, 10))}/${esc(m.actualitzat?.slice(5, 7))} ${esc(m.actualitzat?.slice(11))}</small></h2>
+		<div class="m-actius">${m.actius
+			.map(
+				(a) => `<article class="m-actiu">
+			<div class="m-actiu-cap"><b>${esc(a.nom)}</b><small>${esc(a.que)}</small></div>
+			<span class="m-preu">${preu(a)}</span>
+			${linia(a.serie, a.canvis.any >= 0)}
+			<div class="m-canvis">${canvi('setm.', a.canvis.setmana)}${canvi('mes', a.canvis.mes)}${canvi('any', a.canvis.any)}</div>
+		</article>`,
+			)
+			.join('')}
+			${m.tipus_bce !== undefined ? `<article class="m-actiu m-bce"><div class="m-actiu-cap"><b>Tipus del BCE</b><small>D’aquí surt el que et paga el compte</small></div><span class="m-preu">${m.tipus_bce.toLocaleString('ca-ES', {minimumFractionDigits: 2})} %</span></article>` : ''}
+		</div>
+	</section>`
+		: '<p class="buit">Encara no hi ha preus del mercat.</p>';
+	const resum = m && c ? resumHistoria(m.historia, s.finestra) : null;
+	const ll = (k, nom) => `<label class="m-ll" for="sim-${k}">
+		<span><b>${nom}</b><small>${pct(resum[k].anual * 100)} l’any · pitjor mes ${pct(resum[k].pitjorMes * 100, 0)}</small></span>
+		<input id="sim-${k}" type="range" min="0" max="100" step="5" value="${s[k]}" data-sim="${k}"><output id="out-${k}">${s[k]} %</output>
+	</label>`;
+	const simulador =
+		m && c
+			? `<section class="m-bloc m-sim">
+		<h2 class="etiqueta">${icona('calculadora', 12)} Simulador: on poso els estalvis?</h2>
+		<div class="m-finestres">${FINESTRES.map((f) => `<button type="button" data-finestra="${f.mesos}" aria-pressed="${s.finestra === f.mesos}">${f.nom}</button>`).join('')}</div>
+		<p class="m-explica">Comences amb <b>${eur(Math.max(0, c.compte.saldo - c.matalas))}</b> (sense el matalàs) i cada mes hi afegeixes el que estalvies.</p>
+		<div class="m-ll compte"><span><b>Compte remunerat</b><small>${c.compte.interes_aviat} % l’any · no baixa mai</small></span><div class="m-barra"><i id="barra-compte" style="width:${100 - s.msci - s.btc - s.eth}%"></i></div><output id="out-compte">${100 - s.msci - s.btc - s.eth} %</output></div>
+		${ll('msci', 'MSCI World')}${ll('btc', 'Bitcoin')}${ll('eth', 'Ethereum')}
+		<label class="m-ll" for="sim-anys"><span><b>Anys</b><small>fins que necessites els diners</small></span><input id="sim-anys" type="range" min="1" max="15" value="${s.anys ?? c.objectiu.anys}" data-sim="anys"><output id="out-anys">${s.anys ?? c.objectiu.anys}</output></label>
+		<label class="m-ll" for="sim-aportacio"><span><b>Cada mes</b><small>el que hi afegeixes</small></span><input id="sim-aportacio" type="range" min="0" max="2000" step="50" value="${s.aportacio ?? c.aportacio}" data-sim="aportacio"><output id="out-aportacio">${eur(s.aportacio ?? c.aportacio)}</output></label>
+		<div id="sim-resultat" class="m-resultat">${resultatSim()}</div>
+	</section>`
+			: '';
+	return `<header class="cap">
+		<span class="sobre">Mercat</span>
+		<h1>Els teus diners</h1>
+		<p>Com està el mercat i què podria passar amb els teus estalvis. Reshi analitza i explica; la decisió és teva.</p>
+	</header>
+	${situacio}${actius}${simulador}`;
+}
+
+// moure un lliscador: només es refà el resultat, perquè el dit no perdi el lliscador
+document.addEventListener('input', (ev) => {
+	const k = ev.target.dataset?.sim;
+	if (!k) return;
+	const s = estat.sim;
+	let v = Number(ev.target.value);
+	if (['msci', 'btc', 'eth'].includes(k)) {
+		v = Math.min(v, 100 - (s.msci + s.btc + s.eth - s[k]));
+		ev.target.value = v;
+	}
+	s[k] = v;
+	guardat.posar('reshi-sim', s);
+	const out = document.getElementById(`out-${k}`);
+	if (out) out.textContent = k === 'aportacio' ? eur(v) : k === 'anys' ? String(v) : `${v} %`;
+	const compte = 100 - s.msci - s.btc - s.eth;
+	document.getElementById('out-compte').textContent = `${compte} %`;
+	document.getElementById('barra-compte').style.width = `${compte}%`;
+	document.getElementById('sim-resultat').innerHTML = resultatSim();
+});
 
 function vistaVitrina() {
 	const v = estat.dades.vitrina;
@@ -219,9 +394,10 @@ function pintar() {
 	}
 	app.innerHTML = `
 	<div class="marca"><img src="icona-192.png" alt=""><b>RESHI</b>${estat.personal ? `<span class="obert" title="La part personal està oberta">${icona('obert', 13)}</span>` : ''}</div>
-	<main class="pantalla">${estat.vista === 'noticies' ? vistaNoticies() : vistaVitrina()}</main>
+	<main class="pantalla">${estat.vista === 'noticies' ? vistaNoticies() : estat.vista === 'mercat' ? vistaMercat() : vistaVitrina()}</main>
 	<nav class="pestanyes" aria-label="Seccions">
 		<button type="button" data-vista="noticies" aria-pressed="${estat.vista === 'noticies'}">${icona('noticies', 20)}<span>Notícies</span></button>
+		<button type="button" data-vista="mercat" aria-pressed="${estat.vista === 'mercat'}">${icona('mercat', 20)}<span>Mercat</span></button>
 		<button type="button" data-vista="vitrina" aria-pressed="${estat.vista === 'vitrina'}">${icona('vitrina', 20)}<span>Vitrina</span></button>
 	</nav>
 	${estat.lector !== null ? vistaLector() : ''}`;
@@ -258,6 +434,10 @@ document.addEventListener('click', (ev) => {
 		estat.vista = b.dataset.vista;
 		pintar();
 		window.scrollTo(0, 0);
+	} else if (b.dataset.finestra !== undefined) {
+		estat.sim.finestra = Number(b.dataset.finestra);
+		guardat.posar('reshi-sim', estat.sim);
+		pintar();
 	} else if (b.dataset.filtre) {
 		estat.filtre = b.dataset.filtre;
 		pintar();
@@ -289,7 +469,7 @@ document.addEventListener('submit', async (ev) => {
 	ev.preventDefault();
 	const codi = new FormData(ev.target).get('codi') ?? '';
 	try {
-		estat.personal = await obrir(codi);
+		aplicar(await obrir(codi));
 		estat.error = null;
 		guardat.posar('reshi-codi', codi);
 	} catch {
@@ -313,7 +493,7 @@ async function arrencar() {
 		estat.dades = dades;
 		estat.privat = privat;
 		const codi = guardat.llegir('reshi-codi', null);
-		if (codi) estat.personal = await obrir(codi).catch(() => null); // el codi ha canviat: es torna a demanar
+		if (codi) aplicar(await obrir(codi).catch(() => null)); // si el codi ha canviat, es torna a demanar
 	} catch {
 		estat.error = 'No he pogut carregar les notícies. Torna-ho a provar quan tinguis connexió.';
 	}
