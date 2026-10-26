@@ -74,6 +74,9 @@ const foto = (t, classe) =>
 		? `<span class="${classe}" data-tema="${t.tema}"><img src="${esc(t.imatge)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">${icona(TEMES[t.tema].icona, 28)}</span>`
 		: `<span class="${classe}" data-tema="${t.tema}">${icona(TEMES[t.tema].icona, 28)}</span>`;
 
+// la xifra que resumeix la notícia: grossa, en daurat
+const xifra = (t, classe = 'xifra') => (t.xifra ? `<span class="${classe}"><b>${esc(t.xifra.valor)}</b><span>${esc(t.xifra.que)}</span></span>` : '');
+
 const etiqueta = (tema, nova) =>
 	`<span class="etiqueta" data-tema="${tema}">${icona(TEMES[tema].icona, 12)} ${TEMES[tema].nom}${nova ? `<em class="nou">Nou · ${esc(dataCurta(nova))}</em>` : ''}</span>`;
 
@@ -118,19 +121,32 @@ function vistaNoticies() {
 		primera
 			? `<button type="button" class="portada" data-obrir="0">
 		${foto(primera, 'portada-foto')}
-		<span class="portada-text">${etiqueta(primera.tema, primera.nova)}<h2>${esc(primera.titol)}</h2><p>${esc(primera.frase)}</p></span>
+		<span class="portada-text">${etiqueta(primera.tema, primera.nova)}<h2>${esc(primera.titol)}</h2>${xifra(primera)}</span>
 	</button>`
 			: ''
 	}
 	<ul class="llista">${resta
 		.map(
 			(t, i) => `<li><button type="button" class="fila ${estat.vots[t.id] === -1 ? 'sobra' : ''}" data-obrir="${i + 1}">
-		<span class="fila-text">${etiqueta(t.tema, t.nova)}<b>${esc(t.titol)}</b><small>${esc(t.frase)}</small></span>
+		<span class="fila-text">${etiqueta(t.tema, t.nova)}<b>${esc(t.titol)}</b>${xifra(t)}</span>
 		${foto(t, 'fila-foto')}
 	</button></li>`,
 		)
-		.join('')}</ul>`;
+		.join('')}</ul>
+	${votsPerPassar()}`;
 }
+
+// mentre els vots del mòbil no arribin sols a Reshi: un botó que els copia per enganxar-los al xat amb el Claude
+function votsPerPassar() {
+	const n = Object.keys(estat.vots).length;
+	if (!n) return '';
+	return `<section class="passar">
+		<p><b>${n} ${n === 1 ? 'vot' : 'vots'} en aquest mòbil.</b> Encara no arriben sols a Reshi: copia’ls i enganxa’ls al xat amb el Claude.</p>
+		<button type="button" data-copiar-vots>Copiar els vots</button>
+	</section>`;
+}
+const textVots = () =>
+	['VOTS RESHI', ...Object.entries(estat.vots).map(([id, v]) => `${v > 0 ? '+1' : '-1'} ${id}`)].join(String.fromCharCode(10));
 
 function vistaVitrina() {
 	const v = estat.dades.vitrina;
@@ -170,6 +186,7 @@ function vistaLector() {
 		<div class="pagina-cos">
 			${etiqueta(t.tema, t.nova)}
 			<h2>${esc(t.titol)}</h2>
+			${xifra(t, 'xifra gran')}
 			<p class="entradeta">${esc(t.frase)}</p>
 			<section><h3>Què passa</h3><p>${esc(t.que_passa)}</p></section>
 			${
@@ -248,6 +265,15 @@ document.addEventListener('click', (ev) => {
 		obrirLector(Number(b.dataset.obrir));
 	} else if (b.hasAttribute('data-tancar')) {
 		history.back();
+	} else if (b.hasAttribute('data-copiar-vots')) {
+		const text = textVots();
+		navigator.clipboard
+			.writeText(text)
+			.then(() => (b.textContent = 'Copiats! Enganxa’ls al xat'))
+			.catch(() => {
+				b.insertAdjacentHTML('afterend', `<textarea readonly rows="6">${esc(text)}</textarea>`);
+				b.nextElementSibling.select();
+			});
 	} else if (b.dataset.vot) {
 		const v = Number(b.dataset.vot);
 		const id = b.dataset.id;
