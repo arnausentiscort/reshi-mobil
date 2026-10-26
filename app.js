@@ -61,11 +61,23 @@ const estat = {
 	lector: null,
 	error: null,
 	sim: guardat.llegir('reshi-sim', {msci: 60, btc: 15, eth: 0, anys: null, aportacio: null, finestra: 60}),
+	vistes: new Set(guardat.llegir('reshi-vistes', [])), // les que ja ha llegit (aquí o a l'ordinador)
+	llegidesAbans: new Set(), // les llegides quan es va pintar la llista: l'ordre es fa amb aquestes perquè res salti mentre llegeix
 };
+const desarVistes = () => guardat.posar('reshi-vistes', [...estat.vistes]);
+const llegir = (id) => {
+	if (estat.vistes.has(id)) return;
+	estat.vistes.add(id);
+	desarVistes();
+};
+const refreshLlegides = () => (estat.llegidesAbans = new Set(estat.vistes));
 // el que surt del privat.json: abans només eren les notícies; ara, notícies i cartera
 const aplicar = (obert) => {
 	estat.personal = obert?.noticies ?? obert;
 	estat.cartera = obert?.cartera ?? null;
+	for (const id of obert?.vistes ?? []) estat.vistes.add(id); // les que ja va llegir a l'ordinador
+	desarVistes();
+	refreshLlegides();
 };
 
 // --- la part personal: PBKDF2 + AES-GCM, igual que web_mobil.py ---
@@ -83,8 +95,16 @@ const targetesVisibles = () => {
 	const temes = FILTRES.find((f) => f.id === estat.filtre)?.temes;
 	return [...estat.dades.edicio.targetes].sort(ordre).filter((t) => !temes || temes.includes(t.tema));
 };
-// les urgents d'entre setmana ("nova": el dia que van entrar) van primer, les més noves davant; després, per importància
-const ordre = (a, b) => (b.nova ?? '').localeCompare(a.nova ?? '') || b.punts - a.punts;
+// les ja llegides al final; les urgents d'entre setmana ("nova") primer, les més noves davant; després, per importància
+const ordre = (a, b) =>
+	Number(estat.llegidesAbans.has(a.id)) - Number(estat.llegidesAbans.has(b.id)) || (b.nova ?? '').localeCompare(a.nova ?? '') || b.punts - a.punts;
+const noves = () => estat.dades.edicio.targetes.filter((t) => !estat.vistes.has(t.id)).length;
+// "2026-10-26 08:35" -> "avui a les 08:35", "ahir a les...", "dilluns a les..."
+const quan = (s) => {
+	const d = new Date(s.replace(' ', 'T'));
+	const dies = Math.round((new Date().setHours(0, 0, 0, 0) - new Date(d).setHours(0, 0, 0, 0)) / 86400000);
+	return `${dies === 0 ? 'avui' : dies === 1 ? 'ahir' : DIES[d.getDay()]} a les ${s.slice(11, 16)}`;
+};
 
 const foto = (t, classe) =>
 	t.imatge
@@ -111,14 +131,29 @@ function vistaNoticies() {
 	const e = estat.dades.edicio;
 	const avui = new Date().toISOString().slice(0, 10);
 	const llista = targetesVisibles();
-	const [primera, ...resta] = llista;
+	const pendents = llista.filter((t) => !estat.llegidesAbans.has(t.id));
+	const [primera, ...resta] = pendents;
+	const llegides = llista.filter((t) => estat.llegidesAbans.has(t.id));
+	const n = noves();
 	const agenda = e.agenda.filter((a) => a.data >= avui);
+	const fila = (t, i) => `<li><button type="button" class="fila ${estat.vots[t.id] === -1 ? 'sobra' : ''} ${estat.vistes.has(t.id) ? 'vista' : ''}" data-obrir="${i}">
+		<span class="fila-text">${etiqueta(t.tema, t.nova)}<b>${esc(t.titol)}</b>${xifra(t)}</span>
+		${foto(t, 'fila-foto')}
+	</button></li>`;
 	return `
 	<header class="cap">
 		<span class="sobre">${esc(dataLlarga(e.data))}</span>
 		<h1>${esc(e.titol)}</h1>
 		<p>${esc(e.intro)}</p>
 	</header>
+	<div class="estat-noves">
+		${e.actualitzat ? `<span>Actualitzat ${esc(quan(e.actualitzat))}</span>` : ''}
+		${
+			n
+				? `<b class="noves">${n === 1 ? '1 nova' : `${n} noves`}</b><button type="button" data-llegir-totes>Marcar llegides</button>`
+				: `<b class="al-dia">${icona('fet', 14)} Les has llegit totes</b>`
+		}
+	</div>
 	${estat.personal ? '' : formCodi('La part que va per tu', 'Posa el codi i cada notícia et dirà per què t’importa. El mòbil el recordarà.')}
 	${
 		agenda.length
@@ -140,14 +175,13 @@ function vistaNoticies() {
 	</button>`
 			: ''
 	}
-	<ul class="llista">${resta
-		.map(
-			(t, i) => `<li><button type="button" class="fila ${estat.vots[t.id] === -1 ? 'sobra' : ''}" data-obrir="${i + 1}">
-		<span class="fila-text">${etiqueta(t.tema, t.nova)}<b>${esc(t.titol)}</b>${xifra(t)}</span>
-		${foto(t, 'fila-foto')}
-	</button></li>`,
-		)
-		.join('')}</ul>
+	<ul class="llista">${resta.map((t, i) => fila(t, i + 1)).join('')}</ul>
+	${
+		llegides.length
+			? `<h2 class="etiqueta separador">${icona('fet', 12)} Ja llegides</h2>
+	<ul class="llista">${llegides.map((t, i) => fila(t, pendents.length + i)).join('')}</ul>`
+			: ''
+	}
 	${votsPerPassar()}`;
 }
 
@@ -396,7 +430,7 @@ function pintar() {
 	<div class="marca"><img src="icona-192.png" alt=""><b>RESHI</b>${estat.personal ? `<span class="obert" title="La part personal està oberta">${icona('obert', 13)}</span>` : ''}</div>
 	<main class="pantalla">${estat.vista === 'noticies' ? vistaNoticies() : estat.vista === 'mercat' ? vistaMercat() : vistaVitrina()}</main>
 	<nav class="pestanyes" aria-label="Seccions">
-		<button type="button" data-vista="noticies" aria-pressed="${estat.vista === 'noticies'}">${icona('noticies', 20)}<span>Notícies</span></button>
+		<button type="button" data-vista="noticies" aria-pressed="${estat.vista === 'noticies'}">${icona('noticies', 20)}<span>Notícies</span>${estat.dades && noves() ? `<i class="pastilla">${noves()}</i>` : ''}</button>
 		<button type="button" data-vista="mercat" aria-pressed="${estat.vista === 'mercat'}">${icona('mercat', 20)}<span>Mercat</span></button>
 		<button type="button" data-vista="vitrina" aria-pressed="${estat.vista === 'vitrina'}">${icona('vitrina', 20)}<span>Vitrina</span></button>
 	</nav>
@@ -409,6 +443,7 @@ function pintar() {
 			const i = Math.round(pistes.scrollLeft / pistes.clientWidth);
 			if (i === estat.lector) return;
 			estat.lector = i;
+			llegir(targetesVisibles()[i].id);
 			document.getElementById('compte').textContent = `${i + 1} / ${targetesVisibles().length}`;
 			document.querySelectorAll('.lector-punts i').forEach((p, j) => p.classList.toggle('ara', j === i));
 		});
@@ -417,12 +452,14 @@ function pintar() {
 
 function obrirLector(i) {
 	estat.lector = i;
+	llegir(targetesVisibles()[i].id);
 	history.pushState({lector: true}, ''); // el botó d'enrere del mòbil tanca el lector en lloc de sortir de l'app
 	pintar();
 }
 function tancarLector() {
 	if (estat.lector === null) return;
 	estat.lector = null;
+	refreshLlegides(); // les que acaba de llegir baixen a "Ja llegides"
 	pintar();
 }
 window.addEventListener('popstate', tancarLector);
@@ -432,8 +469,14 @@ document.addEventListener('click', (ev) => {
 	if (!b) return;
 	if (b.dataset.vista) {
 		estat.vista = b.dataset.vista;
+		refreshLlegides();
 		pintar();
 		window.scrollTo(0, 0);
+	} else if (b.hasAttribute('data-llegir-totes')) {
+		for (const t of estat.dades.edicio.targetes) estat.vistes.add(t.id);
+		desarVistes();
+		refreshLlegides();
+		pintar();
 	} else if (b.dataset.finestra !== undefined) {
 		estat.sim.finestra = Number(b.dataset.finestra);
 		guardat.posar('reshi-sim', estat.sim);
@@ -460,6 +503,7 @@ document.addEventListener('click', (ev) => {
 		if (estat.vots[id] === v) delete estat.vots[id];
 		else estat.vots[id] = v;
 		guardat.posar('reshi-vots', estat.vots);
+		llegir(id);
 		b.parentElement.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(estat.vots[id] === Number(x.dataset.vot))));
 	}
 });
@@ -492,6 +536,7 @@ async function arrencar() {
 		const [dades, privat] = await Promise.all([fetch('dades.json', {cache: 'no-cache'}).then((r) => r.json()), fetch('privat.json', {cache: 'no-cache'}).then((r) => r.json())]);
 		estat.dades = dades;
 		estat.privat = privat;
+		refreshLlegides();
 		const codi = guardat.llegir('reshi-codi', null);
 		if (codi) aplicar(await obrir(codi).catch(() => null)); // si el codi ha canviat, es torna a demanar
 	} catch {
