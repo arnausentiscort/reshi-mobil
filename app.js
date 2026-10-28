@@ -65,7 +65,10 @@ const estat = {
 	personal: null,
 	privat: null,
 	vots: guardat.llegir('reshi-vots', {}),
-	votsReshi: {}, // els que ja té Reshi (del privat.json): no cal tornar-los a copiar
+	votsReshi: {}, // els que ja té Reshi (del privat.json): no cal tornar-los a enviar
+	vistesReshi: new Set(), // les llegides que ja té Reshi
+	notes: guardat.llegir('reshi-notes', []), // les notes per a Reshi que encara no han arribat
+	bustia: '', // com ha anat l'últim enviament
 	lector: null,
 	error: null,
 	vistes: new Set(guardat.llegir('reshi-vistes', [])), // les que ja ha llegit (aquí o a l'ordinador)
@@ -78,6 +81,7 @@ const llegir = (id) => {
 	if (estat.vistes.has(id)) return;
 	estat.vistes.add(id);
 	desarVistes();
+	enviarAviat();
 };
 const refreshLlegides = () => (estat.llegidesAbans = new Set(estat.vistes));
 // el que surt del privat.json: el "per què t'importa", les notes dels projectes i les llegides a l'ordinador
@@ -88,13 +92,19 @@ const aplicar = (obert) => {
 	for (const id of obert?.vistes ?? []) estat.vistes.add(id); // les que ja va llegir a l'ordinador
 	// els vots que ja té Reshi: es marquen aquí també (i una votada és una llegida)
 	estat.votsReshi = obert?.vots ?? {};
+	estat.vistesReshi = new Set(obert?.vistes ?? []);
 	for (const [id, v] of Object.entries(estat.votsReshi)) {
 		if (!(id in estat.vots)) estat.vots[id] = v;
 		estat.vistes.add(id);
 	}
-	for (const id of Object.keys(estat.vots)) estat.vistes.add(id);
+	for (const [id, v] of Object.entries(estat.vots)) if (v) estat.vistes.add(id);
 	guardat.posar('reshi-vots', estat.vots);
+	// les notes que Reshi ja té surten de la cua
+	const rebudes = new Set(obert?.rebudes ?? []);
+	estat.notes = estat.notes.filter((n) => !rebudes.has(n.id));
+	guardat.posar('reshi-notes', estat.notes);
 	desarVistes();
+	enviarAviat(0);
 	refreshLlegides();
 };
 
@@ -221,19 +231,82 @@ function vistaNoticies() {
 	${votsPerPassar()}`;
 }
 
-// mentre els vots del mòbil no arribin sols a Reshi: un botó que els copia per enganxar-los al xat amb el Claude
-// només els que Reshi encara no té (o que ha canviat al mòbil)
-const votsNous = () => Object.entries(estat.vots).filter(([id, v]) => estat.votsReshi[id] !== v);
-function votsPerPassar() {
-	const n = votsNous().length;
-	if (!n) return '';
-	return `<section class="passar">
-		<p><b>${n} ${n === 1 ? 'vot nou' : 'vots nous'} en aquest mòbil.</b> Encara no arriben sols a Reshi: copia’ls i enganxa’ls al xat amb el Claude.</p>
-		<button type="button" data-copiar-vots>Copiar els vots</button>
-	</section>`;
+// --- la bústia: els vots, les llegides i les notes arriben sols a Reshi (bustia.py), xifrats amb el codi, per ntfy.sh
+// (un servei de missatges sense comptes). ntfy.sh els guarda 12 hores: el que Reshi encara no té es torna a enviar si fa
+// més d'11 hores que es va enviar.
+const NTFY = 'https://ntfy.sh/';
+const TORNAR = 11 * 3600 * 1000;
+const enviats = guardat.llegir('reshi-enviats', {}); // "v:id:vot", "l:id", "n:id" -> quan es va enviar
+const fresc = (k) => Date.now() - (enviats[k] ?? 0) < TORNAR;
+const hex = (b) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, '0')).join('');
+const b64 = (b) => btoa(String.fromCharCode(...new Uint8Array(b)));
+let bustia = null;
+async function obrirBustia() {
+	const codi = guardat.llegir('reshi-codi', null);
+	if (!codi || !estat.personal) return null;
+	if (bustia?.codi === codi) return bustia;
+	const c = normalitzat(codi);
+	const tema = `reshi-${hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`reshi-bustia:${c}`))).slice(0, 32)}`;
+	const sal = crypto.getRandomValues(new Uint8Array(16));
+	const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(c), 'PBKDF2', false, ['deriveKey']);
+	const iteracions = estat.privat?.iteracions ?? 250000;
+	const clau = await crypto.subtle.deriveKey({name: 'PBKDF2', salt: sal, iterations: iteracions, hash: 'SHA-256'}, base, {name: 'AES-GCM', length: 256}, false, ['encrypt']);
+	return (bustia = {codi, tema, sal: b64(sal), clau});
 }
-const textVots = () =>
-	['VOTS RESHI', ...votsNous().map(([id, v]) => `${v > 0 ? '+1' : '-1'} ${id}`)].join(String.fromCharCode(10));
+// el que Reshi encara no té i no s'ha enviat fa poc
+function perEnviar() {
+	const vots = {};
+	for (const [id, v] of Object.entries(estat.vots)) if ((estat.votsReshi[id] ?? 0) !== v && !fresc(`v:${id}:${v}`)) vots[id] = v;
+	const vistes = [...estat.vistes].filter((id) => !estat.vistesReshi.has(id) && !fresc(`l:${id}`)).slice(0, 80);
+	const notes = estat.notes.filter((n) => !fresc(`n:${n.id}`));
+	return {vots, vistes, notes};
+}
+let enviant = false;
+async function enviar() {
+	const p = perEnviar();
+	if (enviant || (!Object.keys(p.vots).length && !p.vistes.length && !p.notes.length)) return;
+	const b = await obrirBustia().catch(() => null);
+	if (!b) return;
+	enviant = true;
+	try {
+		const iv = crypto.getRandomValues(new Uint8Array(12));
+		const xifrat = await crypto.subtle.encrypt({name: 'AES-GCM', iv}, b.clau, new TextEncoder().encode(JSON.stringify(p)));
+		const r = await fetch(NTFY + b.tema, {method: 'POST', body: JSON.stringify({sal: b.sal, iv: b64(iv), dades: b64(xifrat)})});
+		if (!r.ok) throw new Error(r.status);
+		const ara = Date.now();
+		for (const [id, v] of Object.entries(p.vots)) enviats[`v:${id}:${v}`] = ara;
+		for (const id of p.vistes) enviats[`l:${id}`] = ara;
+		for (const n of p.notes) enviats[`n:${n.id}`] = ara;
+		for (const [k, t] of Object.entries(enviats)) if (ara - t > 3 * 86400000) delete enviats[k];
+		guardat.posar('reshi-enviats', enviats);
+		estat.bustia = p.notes.length ? 'Enviat a Reshi.' : '';
+	} catch {
+		estat.bustia = 'No s’ha pogut enviar: ho tornaré a provar quan tinguis connexió.';
+	} finally {
+		enviant = false;
+	}
+	const caixa = document.getElementById('bustia-estat');
+	if (caixa) caixa.textContent = estat.bustia;
+}
+let rellotge = null;
+const enviarAviat = (ms = 2000) => {
+	clearTimeout(rellotge);
+	rellotge = setTimeout(enviar, ms);
+};
+document.addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && enviar());
+window.addEventListener('online', () => enviarAviat(0));
+
+// el formulari per enviar una nota a Reshi (una idea, un tema que vol seguir, una compra...): només amb el codi posat
+function votsPerPassar() {
+	if (!estat.personal) return '';
+	const cua = estat.notes.length;
+	return `<form class="passar" id="form-nota">
+		<p><b>Envia una nota a Reshi.</b> Una idea, un tema que vols que segueixi, el que sigui: hi arriba sol. Els vots i les llegides també hi arriben sols.</p>
+		<textarea name="text" rows="3" maxlength="2000" placeholder="Escriu aquí…" required></textarea>
+		<button type="submit">Enviar a Reshi</button>
+		<p class="bustia-estat" id="bustia-estat" aria-live="polite">${esc(estat.bustia || (cua ? `${cua} ${cua === 1 ? 'nota encara no ha arribat' : 'notes encara no han arribat'} a Reshi.` : ''))}</p>
+	</form>`;
+}
 
 // --- Mercat: com està la setmana, per què, la cartera de prova de Reshi i què pot passar (el mateix que a Reshi) ---
 const eur = (x) => `${Math.round(x).toLocaleString('ca-ES')} €`;
@@ -756,24 +829,30 @@ document.addEventListener('click', (ev) => {
 		pistes.scrollBy({left: Number(b.dataset.pas) * pistes.clientWidth, behavior: 'smooth'});
 	} else if (b.hasAttribute('data-tancar')) {
 		history.back();
-	} else if (b.hasAttribute('data-copiar-vots')) {
-		const text = textVots();
-		navigator.clipboard
-			.writeText(text)
-			.then(() => (b.textContent = 'Copiats! Enganxa’ls al xat'))
-			.catch(() => {
-				b.insertAdjacentHTML('afterend', `<textarea readonly rows="6">${esc(text)}</textarea>`);
-				b.nextElementSibling.select();
-			});
 	} else if (b.dataset.vot) {
 		const v = Number(b.dataset.vot);
 		const id = b.dataset.id;
-		if (estat.vots[id] === v) delete estat.vots[id];
-		else estat.vots[id] = v;
+		// treure un vot és un 0 (no esborrar-lo): així Reshi també el treu
+		estat.vots[id] = estat.vots[id] === v ? 0 : v;
 		guardat.posar('reshi-vots', estat.vots);
 		llegir(id);
+		enviarAviat();
 		b.parentElement.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(estat.vots[id] === Number(x.dataset.vot))));
 	}
+});
+
+document.addEventListener('submit', (ev) => {
+	if (ev.target.id !== 'form-nota') return;
+	ev.preventDefault();
+	const text = String(new FormData(ev.target).get('text') ?? '').trim();
+	if (!text) return;
+	const ara = new Date();
+	estat.notes.push({id: `${ara.getTime().toString(36)}-${Math.random().toString(36).slice(2, 6)}`, text, quan: ara.toISOString().slice(0, 16).replace('T', ' ')});
+	guardat.posar('reshi-notes', estat.notes);
+	ev.target.reset();
+	estat.bustia = 'Enviant…';
+	document.getElementById('bustia-estat').textContent = estat.bustia;
+	enviar();
 });
 
 document.addEventListener('submit', async (ev) => {

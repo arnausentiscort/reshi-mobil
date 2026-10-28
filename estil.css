@@ -170,7 +170,9 @@ img { display: block; max-width: 100%; }
 .passar p { margin: 0; font-size: 13.5px; color: var(--text-2); }
 .passar p b { color: var(--text); }
 .passar button { height: 44px; border: 0; border-radius: 12px; font-weight: 800; color: #1a1408; background: var(--or); }
-.passar textarea { width: 100%; padding: 10px; border: 0; border-radius: 10px; font-family: var(--mono); font-size: 12px; color: var(--text); background: var(--fons); }
+.passar textarea { width: 100%; padding: 10px 12px; border: 0; border-radius: 10px; font: inherit; font-size: 15px; color: var(--text); background: var(--fons); resize: vertical; }
+.passar .bustia-estat { min-height: 1em; font-size: 12.5px; }
+.passar .bustia-estat:empty { display: none; }
 
 /* llegides: a dalt quantes en queden; les llegides, apagades i al final */
 .estat-noves { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; font-size: 12.5px; color: var(--text-3); }
