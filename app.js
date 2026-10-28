@@ -65,6 +65,7 @@ const estat = {
 	personal: null,
 	privat: null,
 	vots: guardat.llegir('reshi-vots', {}),
+	votsReshi: {}, // els que ja té Reshi (del privat.json): no cal tornar-los a copiar
 	lector: null,
 	error: null,
 	vistes: new Set(guardat.llegir('reshi-vistes', [])), // les que ja ha llegit (aquí o a l'ordinador)
@@ -85,6 +86,14 @@ const aplicar = (obert) => {
 	estat.projectes = obert?.projectes ?? null; // la nota de cada projecte de la vitrina (què ha fet, què falta)
 	estat.diners = obert?.diners ?? null; // els seus diners de debò
 	for (const id of obert?.vistes ?? []) estat.vistes.add(id); // les que ja va llegir a l'ordinador
+	// els vots que ja té Reshi: es marquen aquí també (i una votada és una llegida)
+	estat.votsReshi = obert?.vots ?? {};
+	for (const [id, v] of Object.entries(estat.votsReshi)) {
+		if (!(id in estat.vots)) estat.vots[id] = v;
+		estat.vistes.add(id);
+	}
+	for (const id of Object.keys(estat.vots)) estat.vistes.add(id);
+	guardat.posar('reshi-vots', estat.vots);
 	desarVistes();
 	refreshLlegides();
 };
@@ -213,16 +222,18 @@ function vistaNoticies() {
 }
 
 // mentre els vots del mòbil no arribin sols a Reshi: un botó que els copia per enganxar-los al xat amb el Claude
+// només els que Reshi encara no té (o que ha canviat al mòbil)
+const votsNous = () => Object.entries(estat.vots).filter(([id, v]) => estat.votsReshi[id] !== v);
 function votsPerPassar() {
-	const n = Object.keys(estat.vots).length;
+	const n = votsNous().length;
 	if (!n) return '';
 	return `<section class="passar">
-		<p><b>${n} ${n === 1 ? 'vot' : 'vots'} en aquest mòbil.</b> Encara no arriben sols a Reshi: copia’ls i enganxa’ls al xat amb el Claude.</p>
+		<p><b>${n} ${n === 1 ? 'vot nou' : 'vots nous'} en aquest mòbil.</b> Encara no arriben sols a Reshi: copia’ls i enganxa’ls al xat amb el Claude.</p>
 		<button type="button" data-copiar-vots>Copiar els vots</button>
 	</section>`;
 }
 const textVots = () =>
-	['VOTS RESHI', ...Object.entries(estat.vots).map(([id, v]) => `${v > 0 ? '+1' : '-1'} ${id}`)].join(String.fromCharCode(10));
+	['VOTS RESHI', ...votsNous().map(([id, v]) => `${v > 0 ? '+1' : '-1'} ${id}`)].join(String.fromCharCode(10));
 
 // --- Mercat: com està la setmana, per què, la cartera de prova de Reshi i què pot passar (el mateix que a Reshi) ---
 const eur = (x) => `${Math.round(x).toLocaleString('ca-ES')} €`;
