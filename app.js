@@ -466,7 +466,7 @@ function vistaMercat() {
 	${m.termometres ? `<div class="m-termos">${m.termometres.borsa ? termo('Borsa', m.termometres.borsa, 'borsa') : ''}${m.termometres.cripto ? termo('Cripto', m.termometres.cripto, 'cripto') : ''}</div>` : ''}
 	<div class="m-actius">${m.actius
 		.map(
-			(a) => `<article class="m-actiu">
+			(a) => `<article class="m-actiu ${a.canvis.setmana >= 0 ? 'puja' : 'baixa'}">
 		<header><b>${esc(a.nom)}</b><span class="m-setmana ${a.canvis.setmana > 0 ? 'puja' : a.canvis.setmana < 0 ? 'baixa' : ''}">${a.canvis.setmana >= 0 ? '↗' : '↘'} ${pct(a.canvis.setmana)}</span></header>
 		<span class="m-preu">${preu(a)}</span>
 		${linia(a.serie, a.canvis.mes >= 0)}
@@ -887,6 +887,20 @@ document.addEventListener('submit', async (ev) => {
 	}
 	pintar();
 });
+
+// la llum que segueix el ratolí per sobre de les targetes (a l'ordinador): només es diu on és el ratolí; el dibuix és a estil.css
+const TARGETES = '.m-actiu, .m-termo, .m-cartera-xifres > div, .m-resum, .m-futur > li, .m-cartera, .m-mapa, .m-qui, .m-dos-barres, .portada, .m-causes > li';
+document.addEventListener(
+	'pointermove',
+	(ev) => {
+		const el = ev.target.closest?.(TARGETES);
+		if (!el) return;
+		const r = el.getBoundingClientRect();
+		el.style.setProperty('--x', `${ev.clientX - r.left}px`);
+		el.style.setProperty('--y', `${ev.clientY - r.top}px`);
+	},
+	{passive: true},
+);
 
 document.addEventListener('keydown', (ev) => {
 	if (estat.lector === null) return;

@@ -151,9 +151,6 @@ img { display: block; max-width: 100%; }
 	.cap h1 { font-size: 40px; }
 	.vitrina { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
-@media (prefers-reduced-motion: reduce) {
-	*, .lector { animation: none !important; transition: none !important; }
-}
 .nou { margin-left: 4px; padding: 2px 7px; border-radius: 6px; font-style: normal; font-size: 9.5px; letter-spacing: 0.08em; color: #1a1408; background: var(--or); }
 
 /* la xifra de cada notícia: el número primer, què és al costat */
@@ -466,3 +463,88 @@ img { display: block; max-width: 100%; }
 .m-resultat b { font-size: 11.5px; letter-spacing: 0.04em; text-transform: uppercase; color: #3fc493; }
 .m-resultat p { margin: 4px 0 0; }
 .m-futur li.passat .m-data { opacity: 0.6; }
+
+/* --- Vida: llum que segueix el ratolí, targetes que s'aixequen, gràfics que es dibuixen en entrar --- */
+.m-actiu, .m-termo, .m-cartera-xifres > div, .m-resum, .m-futur > li, .m-cartera, .m-mapa, .m-qui, .m-dos-barres, .m-causes > li { position: relative; isolation: isolate; }
+.m-actiu::after, .m-termo::after, .m-cartera-xifres > div::after, .m-resum::after, .m-futur > li::after, .m-cartera::after, .m-mapa::after, .m-qui::after, .m-dos-barres::after, .m-causes > li::after {
+	content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity 0.35s ease;
+	background: radial-gradient(340px circle at var(--x, 50%) var(--y, 0%), rgba(var(--or-rgb), 0.11), transparent 65%);
+}
+.m-actiu, .m-termo, .m-cartera-xifres > div, .m-futur > li, .m-causes > li, .portada, .fila, .m-noticia, .m-aposta, .filtres button { transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1), box-shadow 0.3s, background 0.3s, opacity 0.2s; }
+/* al mòbil: en tocar s'enfonsa una mica */
+.m-actiu:active, .m-termo:active, .m-cartera-xifres > div:active, .m-futur > li:active, .portada:active, .m-noticia:active, .m-aposta:active { transform: scale(0.98); }
+@media (hover: hover) {
+	.m-actiu:hover::after, .m-termo:hover::after, .m-cartera-xifres > div:hover::after, .m-resum:hover::after, .m-futur > li:hover::after, .m-cartera:hover::after, .m-mapa:hover::after, .m-qui:hover::after, .m-dos-barres:hover::after, .m-causes > li:hover::after { opacity: 1; }
+	.m-actiu:hover, .m-termo:hover, .m-cartera-xifres > div:hover, .m-futur > li:hover { transform: translateY(-3px); }
+	.m-actiu.puja:hover { box-shadow: inset 0 0 0 1px rgba(74, 222, 128, 0.45), 0 18px 36px -20px rgba(74, 222, 128, 0.45); }
+	.m-actiu.baixa:hover { box-shadow: inset 0 0 0 1px rgba(229, 83, 75, 0.45), 0 18px 36px -20px rgba(229, 83, 75, 0.45); }
+	.m-actiu.puja::after { background: radial-gradient(300px circle at var(--x, 50%) var(--y, 0%), rgba(74, 222, 128, 0.12), transparent 65%); }
+	.m-actiu.baixa::after { background: radial-gradient(300px circle at var(--x, 50%) var(--y, 0%), rgba(229, 83, 75, 0.12), transparent 65%); }
+	.m-actiu:hover .m-preu { text-shadow: 0 0 18px rgba(255, 255, 255, 0.35); }
+	.m-actiu:hover .m-linia polyline { stroke-width: 2.4; }
+	.m-termo:hover, .m-futur > li:hover { box-shadow: inset 0 0 0 1px rgba(var(--or-rgb), 0.35), 0 16px 32px -20px rgba(var(--or-rgb), 0.45); }
+	.m-cartera-xifres > div:hover { box-shadow: inset 0 0 0 1px rgba(var(--or-rgb), 0.4), 0 14px 30px -18px rgba(var(--or-rgb), 0.5); }
+	.m-cartera-xifres > div:hover b { text-shadow: 0 0 20px rgba(var(--or-rgb), 0.55); }
+	.m-data { transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1), background 0.3s; }
+	.m-futur > li:hover .m-data { transform: scale(1.08) rotate(-3deg); background: rgba(var(--or-rgb), 0.2); }
+	.m-num { transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1), box-shadow 0.3s; }
+	.m-causes > li:hover .m-num { transform: scale(1.12); box-shadow: 0 0 0 4px rgba(var(--or-rgb), 0.18), 0 0 22px rgba(var(--or-rgb), 0.5); }
+	.m-aposta:hover, .m-noticia:hover { transform: translateX(3px); box-shadow: inset 0 0 0 1px rgba(var(--or-rgb), 0.45), 0 0 24px -8px rgba(var(--or-rgb), 0.5); }
+	.m-aposta:hover .m-aposta-barra i { box-shadow: 0 0 12px rgba(var(--or-rgb), 0.8); }
+	.portada:hover { transform: translateY(-3px); box-shadow: inset 0 0 0 1px rgba(var(--or-rgb), 0.4), 0 24px 50px -24px rgba(var(--or-rgb), 0.5); }
+	.portada:hover .portada-foto img { transform: scale(1.04); }
+	.portada-foto img { transition: transform 0.8s cubic-bezier(0.32, 0.72, 0, 1); }
+	.fila:hover { transform: translateX(4px); }
+	.fila:hover b { color: var(--or); }
+	.filtres button:hover { color: var(--text); box-shadow: inset 0 0 0 1px rgba(var(--or-rgb), 0.35); }
+	/* el mapa del MSCI: la que tens a sota s'encén, les altres s'apaguen una mica */
+	.m-mapa g { transition: opacity 0.25s, filter 0.25s; }
+	.m-mapa svg:hover g { opacity: 0.45; }
+	.m-mapa svg g:hover { opacity: 1; filter: brightness(1.18) drop-shadow(0 6px 14px rgba(0, 0, 0, 0.5)); }
+	.m-mapa g rect { transition: stroke 0.2s; stroke: transparent; stroke-width: 2; }
+	.m-mapa g:hover rect { stroke: rgba(255, 255, 255, 0.85); }
+	.m-qui li, .m-barres li, .m-rep-llegenda li { transition: background 0.2s; border-radius: 8px; }
+	.m-qui li:hover, .m-barres li:hover, .m-rep-llegenda li:hover { background: rgba(255, 255, 255, 0.05); }
+	.m-posicions li, .m-apostes-llista > li { transition: background 0.2s; }
+	.m-posicions li:hover, .m-apostes-llista > li:hover { background: linear-gradient(90deg, rgba(var(--or-rgb), 0.06), transparent 70%); }
+	.m-rep-barra i { transition: filter 0.2s, transform 0.3s cubic-bezier(0.32, 0.72, 0, 1); }
+	.m-rep-barra:hover i { filter: saturate(0.5) brightness(0.7); }
+	.m-rep-barra i:hover { filter: brightness(1.2); transform: scaleY(1.15); }
+}
+/* el resum de la setmana: una llum lenta que el travessa */
+.m-resum { overflow: hidden; }
+.m-resum::before {
+	content: ''; position: absolute; inset: -40% -10%; z-index: -1; pointer-events: none;
+	background: conic-gradient(from 0deg at 50% 50%, transparent 0 40%, rgba(var(--or-rgb), 0.12) 50%, transparent 60% 100%);
+	animation: gira-lent 14s linear infinite;
+}
+@keyframes gira-lent { to { transform: rotate(360deg); } }
+.m-resum em { box-shadow: 0 0 18px rgba(var(--or-rgb), 0.45); }
+.m-titol::before { content: ''; align-self: center; width: 4px; height: 0.9em; margin-right: 4px; border-radius: 2px; background: linear-gradient(var(--or), rgba(var(--or-rgb), 0.3)); box-shadow: 0 0 12px rgba(var(--or-rgb), 0.6); }
+.m-actiu { overflow: hidden; }
+.m-actiu.puja { box-shadow: inset 0 2px 0 rgba(74, 222, 128, 0.7), inset 0 0 0 1px var(--vora); }
+.m-actiu.baixa { box-shadow: inset 0 2px 0 rgba(229, 83, 75, 0.7), inset 0 0 0 1px var(--vora); }
+.m-linia.puja polyline { filter: drop-shadow(0 0 3px rgba(74, 222, 128, 0.6)); }
+.m-linia.baixa polyline { filter: drop-shadow(0 0 3px rgba(229, 83, 75, 0.6)); }
+.m-linia polyline { stroke-dasharray: 400; stroke-dashoffset: 400; animation: dibuixa 1.4s cubic-bezier(0.32, 0.72, 0, 1) 0.2s forwards; }
+.m-linia polygon { opacity: 0; animation: apareix-a 0.8s ease 0.9s forwards; }
+@keyframes dibuixa { to { stroke-dashoffset: 0; } }
+@keyframes apareix-a { to { opacity: 1; } }
+.m-aposta-barra i, .m-rep-barra i { transform-origin: left center; animation: creix 1s cubic-bezier(0.32, 0.72, 0, 1) both; }
+.m-qui-eix i { animation: creix-centre 0.9s cubic-bezier(0.32, 0.72, 0, 1) both; }
+@keyframes creix { from { transform: scaleX(0); } }
+@keyframes creix-centre { from { transform: scaleX(0); opacity: 0; } }
+.m-termo-barra i, .m-cami-barra i { animation: llisca 1.1s cubic-bezier(0.32, 0.72, 0, 1) both; box-shadow: 0 0 0 2px var(--panell), 0 0 12px rgba(255, 255, 255, 0.6); }
+@keyframes llisca { from { left: 50%; opacity: 0; } }
+@keyframes puja-a { from { opacity: 0; transform: translateY(10px); } }
+.m-mapa g { animation: puja-a 0.6s cubic-bezier(0.32, 0.72, 0, 1) both; }
+.m-mapa g:nth-child(2) { animation-delay: 0.05s; } .m-mapa g:nth-child(3) { animation-delay: 0.1s; } .m-mapa g:nth-child(4) { animation-delay: 0.15s; }
+.m-mapa g:nth-child(5) { animation-delay: 0.2s; } .m-mapa g:nth-child(n + 6) { animation-delay: 0.25s; }
+@supports (animation-timeline: view()) {
+	.m-bloc { animation: entra-bloc linear both; animation-timeline: view(); animation-range: entry 0% entry 25%; }
+	@keyframes entra-bloc { from { opacity: 0; transform: translateY(24px); } }
+}
+/* l'Arnau té les animacions de Windows apagades però vol que Reshi es mogui: només es para la llum que gira sense parar */
+@media (prefers-reduced-motion: reduce) {
+	.m-resum::before { animation: none; }
+}
