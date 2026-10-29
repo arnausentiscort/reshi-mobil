@@ -2,7 +2,7 @@
 // la setmana (preus, anàlisi, la cartera de prova i les apostes) i la vitrina; privat.json, xifrat, el "per què
 // t'importa" de cada notícia i les notes dels projectes. El codi es posa un cop i el mòbil el recorda. Els vots, de
 // moment, es guarden en aquest mòbil.
-import {COLOR_RESERVA, COLORS_PARTS, colorVariacio, squarify} from './grafics.js';
+import {COLOR_RESERVA, COLORS_PARTS, colorVariacio, fetsDe, marquesSobre, perActiu, squarify} from './grafics.js';
 import {ICONES} from './icones.js';
 
 const TEMES = {
@@ -332,11 +332,17 @@ const preu = (a) =>
 	a.id === 'eurusd'
 		? a.preu.toLocaleString('ca-ES', {minimumFractionDigits: 3, maximumFractionDigits: 3})
 		: `${a.preu.toLocaleString('ca-ES', {maximumFractionDigits: a.preu > 1000 ? 0 : 2})} ${a.moneda === 'EUR' ? '€' : '$'}`;
-const linia = (serie, puja) => {
+// l'últim mes; a sobre, un punt el dia que va sortir cada notícia que hi toca (amb el número si n'hi ha més d'una)
+const linia = (serie, puja, marques = []) => {
 	const min = Math.min(...serie);
 	const max = Math.max(...serie);
 	const pts = serie.map((v, i) => `${((i / (serie.length - 1)) * 100).toFixed(2)},${(30 - ((v - min) / (max - min || 1)) * 26 - 2).toFixed(2)}`).join(' ');
-	return `<svg class="m-linia ${puja ? 'puja' : 'baixa'}" viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true"><polygon points="0,30 ${pts} 100,30"/><polyline points="${pts}" vector-effect="non-scaling-stroke"/></svg>`;
+	return `<div class="m-grafic"><svg class="m-linia ${puja ? 'puja' : 'baixa'}" viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true"><polygon points="0,30 ${pts} 100,30"/><polyline points="${pts}" vector-effect="non-scaling-stroke"/></svg>${marques
+		.map(
+			(x) =>
+				`<button type="button" class="m-marca ${x.efecte} ${x.fets.length > 1 ? 'moltes' : ''}" style="left:${x.x}%;top:${(x.y / 30) * 100}%" data-noticia-cartera="${x.fets[0].id}" aria-label="${x.fets.length} notícies del ${dataBarra(x.data)}" title="${esc(x.fets.map((f) => f.titol).join(' · '))}">${x.fets.length > 1 ? x.fets.length : ''}</button>`,
+		)
+		.join('')}</div>`;
 };
 const dataBarra = (s) => s.split('-').reverse().join('/');
 const diners = (x) => (x >= 1e6 ? `${Math.round(x / 1e6).toLocaleString('ca-ES')} M$` : `${Math.round(x / 1e3).toLocaleString('ca-ES')} mil $`);
@@ -453,6 +459,38 @@ function dinersMeus() {
 }
 const signeDiners = (x) => `${x >= 0 ? '+' : '−'}${eur(Math.abs(x))}`;
 
+// les notícies, ordenades per allò que tens o mires: a favor, en contra o depèn, amb la cadena. Que el fons i el compte són
+// seus només es diu amb el codi posat (és el que hi ha a la part xifrada).
+const ES_TEU = {msci: 'el teu pla', compte: 'on tens els diners'};
+const idsCartera = () => [...new Set(perActiu(estat.dades.edicio.targetes).flatMap((g) => g.llista.map((y) => y.t.id)))];
+function laTevaCartera() {
+	const grups = perActiu(estat.dades.edicio.targetes);
+	if (!grups.length) return '';
+	const d = estat.diners;
+	const te = new Set(d ? ['compte', ...(d.inversions.length ? ['msci'] : [])] : []);
+	return `<section class="m-bloc">
+		<h2 class="m-titol">Què li fan les notícies al que tens <small>cada notícia, a sota del que toca, i cap a on sol empènyer</small></h2>
+		<div class="m-toca-graella">${grups
+			.map((g) => {
+				const parts = [g.bo ? `${g.bo} a favor` : '', g.dolent ? `${g.dolent} en contra` : '', g.depen ? `${g.depen} depèn` : ''].filter(Boolean).join(' · ');
+				const n = g.bo + g.dolent + g.depen;
+				return `<article class="m-toca-grup ${te.has(g.actiu) ? 'meu' : ''}">
+				<header><b>${esc(NOMS_TOCA[g.actiu])}</b>${te.has(g.actiu) ? `<em class="m-etiq real">${ES_TEU[g.actiu]}</em>` : ''}</header>
+				<div class="m-balanc"><span class="m-balanc-barra" aria-hidden="true">${g.bo ? `<i class="bo" style="flex-grow:${g.bo}"></i>` : ''}${g.depen ? `<i class="depen" style="flex-grow:${g.depen}"></i>` : ''}${g.dolent ? `<i class="dolent" style="flex-grow:${g.dolent}"></i>` : ''}</span>
+					<small>${parts} · ${n === 1 ? '1 notícia' : `${n} notícies`}</small></div>
+				<ul>${g.llista
+					.map(
+						({t, x}) => `<li><button type="button" class="m-toca-fila ${estat.vistes.has(clau(t)) ? 'vista' : ''}" data-noticia-cartera="${t.id}">${pastilla(x, {petit: true, senseNom: true})}
+					<span><b>${esc(t.titol)}</b><small><em class="m-que ${x.efecte}">${esc(x.que)}</em> · ${esc(x.per_que)}</small></span></button></li>`,
+					)
+					.join('')}</ul>
+			</article>`;
+			})
+			.join('')}</div>
+		<p class="m-peu">«A favor» vol dir que la notícia sol empènyer cap amunt el que tens (o abaratir el que vols): és la cadena de causes, no una previsió ni un consell. Els punts de les línies de dalt són el dia que va sortir cada notícia; toca’ls per llegir-la.</p>
+	</section>`;
+}
+
 function vistaMercat() {
 	const m = estat.dades.mercat;
 	const s = estat.dades.setmana;
@@ -469,7 +507,7 @@ function vistaMercat() {
 			(a) => `<article class="m-actiu ${a.canvis.setmana >= 0 ? 'puja' : 'baixa'}">
 		<header><b>${esc(a.nom)}</b><span class="m-setmana ${a.canvis.setmana > 0 ? 'puja' : a.canvis.setmana < 0 ? 'baixa' : ''}">${a.canvis.setmana >= 0 ? '↗' : '↘'} ${pct(a.canvis.setmana)}</span></header>
 		<span class="m-preu">${preu(a)}</span>
-		${linia(a.serie, a.canvis.mes >= 0)}
+		${linia(a.serie, a.canvis.mes >= 0, marquesSobre(a.serie, a.dates, fetsDe(estat.dades.edicio.targetes, a.id, estat.dades.edicio.data)))}
 		${s?.actius?.[a.id] ? `<p>${esc(s.actius[a.id])}</p>` : ''}
 		<small class="m-mes">Un mes: ${pct(a.canvis.mes)}</small>
 	</article>`,
@@ -618,7 +656,7 @@ function vistaMercat() {
 		<span class="sobre">Mercat${s?.data ? ` · setmana del ${dataBarra(s.data)}` : ''}</span>
 		<h1>Com està el mercat</h1>
 	</header>
-	${comEsta}${dinersMeus()}${perQue}${dinsMsci(estat.dades.msci, m.actius.find((x) => x.id === 'msci')?.canvis.setmana)}${cartera}${apostes}${futur}
+	${comEsta}${dinersMeus()}${laTevaCartera()}${perQue}${dinsMsci(estat.dades.msci, m.actius.find((x) => x.id === 'msci')?.canvis.setmana)}${cartera}${apostes}${futur}
 	<p class="m-peu">L’anàlisi es renova cada diumenge. Reshi analitza i explica: no és un assessor financer.</p>`;
 }
 
@@ -827,6 +865,10 @@ document.addEventListener('click', (ev) => {
 		// des del Mercat: el lector passa les notícies de mercat, començant per la clicada
 		estat.lectorIds = idsMercat();
 		obrirLector(Math.max(0, estat.lectorIds.indexOf(b.dataset.noticiaMercat)));
+	} else if (b.dataset.noticiaCartera) {
+		// des de la cartera o d'un punt d'una línia: el lector passa les notícies que toquen alguna cosa seva
+		estat.lectorIds = idsCartera();
+		obrirLector(Math.max(0, estat.lectorIds.indexOf(b.dataset.noticiaCartera)));
 	} else if (b.hasAttribute('data-llegir-totes')) {
 		for (const t of estat.dades.edicio.targetes) estat.vistes.add(clau(t));
 		desarVistes();

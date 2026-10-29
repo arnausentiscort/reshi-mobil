@@ -548,3 +548,40 @@ img { display: block; max-width: 100%; }
 @media (prefers-reduced-motion: reduce) {
 	.m-resum::before { animation: none; }
 }
+
+/* --- Les notícies i la cartera: punts sobre les línies i "Què li fan les notícies al que tens" --- */
+.m-grafic { position: relative; }
+.m-marca {
+	position: absolute; width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; padding: 0; border: 2px solid var(--panell); border-radius: 50%;
+	background: #8b8a85; transition: transform 0.25s cubic-bezier(0.32, 0.72, 0, 1), box-shadow 0.25s; animation: apareix-a 0.5s ease 1.2s both;
+}
+.m-marca::before { content: ''; position: absolute; inset: -12px; } /* més fàcil de tocar amb el dit */
+.m-marca.moltes { width: 17px; height: 17px; margin: -8.5px 0 0 -8.5px; color: #111; font: 900 9.5px/13px Inter, sans-serif; text-align: center; }
+.m-marca.bo { background: #4ade80; }
+.m-marca.dolent { background: #e5534b; }
+.m-marca:active { transform: scale(1.4); }
+@media (hover: hover) { .m-marca:hover { transform: scale(1.5); box-shadow: 0 0 0 4px rgba(var(--or-rgb), 0.25), 0 0 14px rgba(var(--or-rgb), 0.6); } }
+.m-toca-graella { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; align-items: start; }
+.m-toca-grup { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 16px; background: var(--panell); box-shadow: inset 0 0 0 1px var(--vora); }
+.m-toca-grup.meu { box-shadow: inset 0 0 0 1px rgba(var(--or-rgb), 0.4); }
+.m-toca-grup header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.m-toca-grup header b { font-size: 17px; font-weight: 900; }
+.m-balanc { display: flex; flex-direction: column; gap: 5px; }
+.m-balanc-barra { display: flex; gap: 2px; height: 6px; border-radius: 3px; overflow: hidden; }
+.m-balanc-barra i { transform-origin: left center; animation: creix 1s cubic-bezier(0.32, 0.72, 0, 1) both; }
+.m-balanc-barra .bo { background: #4ade80; }
+.m-balanc-barra .dolent { background: #e5534b; }
+.m-balanc-barra .depen { background: #6b6a66; }
+.m-balanc small { color: var(--text-2); font-size: 12px; }
+.m-toca-grup ul { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.m-toca-fila { display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 8px; border: 0; border-radius: 10px; background: transparent; color: inherit; font: inherit; text-align: left; transition: background 0.2s, transform 0.3s; }
+.m-toca-fila:active { transform: scale(0.98); background: rgba(var(--or-rgb), 0.07); }
+@media (hover: hover) { .m-toca-fila:hover { background: rgba(var(--or-rgb), 0.07); } }
+.m-toca-fila.vista b { color: var(--text-2); }
+.m-toca-fila > span:last-child { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.m-toca-fila b { font-size: 14px; line-height: 1.3; }
+.m-toca-fila small { color: var(--text-2); font-size: 12.5px; line-height: 1.4; }
+.m-toca-fila .pastilla-toca { flex: none; margin-top: 1px; }
+.m-que { font-style: normal; font-weight: 700; }
+.m-que.bo { color: #4ade80; }
+.m-que.dolent { color: #f0716a; }
