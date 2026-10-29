@@ -132,8 +132,10 @@ const targetesVisibles = () => {
 const llistaLector = () => (estat.lectorIds ? estat.lectorIds.map((id) => estat.dades.edicio.targetes.find((t) => t.id === id)).filter(Boolean) : targetesVisibles());
 // les ja llegides al final; les urgents d'entre setmana ("nova") primer, les més noves davant; després, per importància
 const ordre = (a, b) =>
-	Number(estat.llegidesAbans.has(a.id)) - Number(estat.llegidesAbans.has(b.id)) || (b.nova ?? '').localeCompare(a.nova ?? '') || b.punts - a.punts;
-const noves = () => meves().filter((t) => !estat.vistes.has(t.id)).length;
+	Number(estat.llegidesAbans.has(clau(a))) - Number(estat.llegidesAbans.has(clau(b))) ||
+	(b.actualitzada ?? b.nova ?? '').localeCompare(a.actualitzada ?? a.nova ?? '') ||
+	b.punts - a.punts;
+const noves = () => meves().filter((t) => !estat.vistes.has(clau(t))).length;
 // "2026-10-26 08:35" -> "avui a les 08:35", "ahir a les...", "dilluns a les..."
 const quan = (s) => {
 	const d = new Date(s.replace(' ', 'T'));
@@ -155,8 +157,20 @@ const FLETXA = {bo: '↗', dolent: '↘', depen: '⇄'};
 const pastilla = (x, {petit = false, senseNom = false} = {}) =>
 	`<span class="pastilla-toca ${x.efecte}"><i>${FLETXA[x.efecte]}</i>${senseNom ? '' : `<b>${esc(NOMS_TOCA[x.actiu])}</b>`}${petit ? '' : `<span>${esc(x.que)}</span>`}</span>`;
 const toques = (t) => (t.toca?.length ? `<span class="toques">${t.toca.map((x) => pastilla(x, {petit: true})).join('')}</span>` : '');
-const etiqueta = (tema, nova) =>
-	`<span class="etiqueta" data-tema="${tema}">${icona(TEMES[tema].icona, 12)} ${TEMES[tema].nom}${nova ? `<em class="nou">Nou · ${esc(dataCurta(nova))}</em>` : ''}</span>`;
+const etiqueta = (tema, nova, actualitzada) =>
+	`<span class="etiqueta" data-tema="${tema}">${icona(TEMES[tema].icona, 12)} ${TEMES[tema].nom}${
+		actualitzada ? `<em class="nou actualitzada">Actualitzada · ${esc(dataCurta(actualitzada))}</em>` : nova ? `<em class="nou">Nou · ${esc(dataCurta(nova))}</em>` : ''
+	}</span>`;
+// el que es desa com a llegit: l'id, o l'id i la data de l'última actualització (així una actualitzada torna a ser nova)
+const clau = (t) => t.clau ?? t.id;
+const abans = (t) => (t.titol_abans ? `<small class="abans">Abans: ${esc(t.titol_abans)}</small>` : '');
+const haPassat = (t) =>
+	t.actualitzacions?.length
+		? `<section class="ha-passat"><h3>Què ha passat</h3>${[...t.actualitzacions]
+				.reverse()
+				.map((a) => `<div><b>${esc(dataCurta(a.data))} · ${esc(a.titol)}</b>${(Array.isArray(a.text) ? a.text : [a.text]).map((x) => `<p>${esc(x)}</p>`).join('')}</div>`)
+				.join('')}</section>`
+		: '';
 
 const formCodi = (titol, text) => `<form class="cadenat" id="form-codi">
 		<span class="cadenat-icona">${icona('cadenat', 18)}</span>
@@ -177,8 +191,8 @@ function vistaNoticies() {
 	const llegides = llista.filter((t) => estat.llegidesAbans.has(t.id));
 	const n = noves();
 	const agenda = e.agenda.filter((a) => a.data >= avui);
-	const fila = (t, i) => `<li><button type="button" class="fila ${estat.vots[t.id] === -1 ? 'sobra' : ''} ${estat.vistes.has(t.id) ? 'vista' : ''}" data-obrir="${i}">
-		<span class="fila-text">${etiqueta(t.tema, t.nova)}<b>${esc(t.titol)}</b>${xifra(t)}${toques(t)}</span>
+	const fila = (t, i) => `<li><button type="button" class="fila ${estat.vots[t.id] === -1 ? 'sobra' : ''} ${estat.vistes.has(clau(t)) ? 'vista' : ''}" data-obrir="${i}">
+		<span class="fila-text">${etiqueta(t.tema, t.nova, t.actualitzada)}<b>${esc(t.titol)}</b>${abans(t)}${xifra(t)}${toques(t)}</span>
 		${foto(t, 'fila-foto')}
 	</button></li>`;
 	return `
@@ -212,7 +226,7 @@ function vistaNoticies() {
 		primera
 			? `<button type="button" class="portada" data-obrir="0">
 		${foto(primera, 'portada-foto')}
-		<span class="portada-text">${etiqueta(primera.tema, primera.nova)}<h2>${esc(primera.titol)}</h2>${xifra(primera)}${toques(primera)}</span>
+		<span class="portada-text">${etiqueta(primera.tema, primera.nova, primera.actualitzada)}<h2>${esc(primera.titol)}</h2>${abans(primera)}${xifra(primera)}${toques(primera)}</span>
 	</button>`
 			: ''
 	}
@@ -343,7 +357,7 @@ const idsMercat = () => {
 	return [...delsMotius, ...altres].filter((id) => estat.dades.edicio.targetes.some((t) => t.id === id));
 };
 const filaNoticia = (t) => `<button type="button" class="m-noticia" data-noticia-mercat="${t.id}">
-		${foto(t, 'fila-foto')}<span class="fila-text">${etiqueta(t.tema, t.nova)}<b>${esc(t.titol)}</b>${xifra(t)}</span>
+		${foto(t, 'fila-foto')}<span class="fila-text">${etiqueta(t.tema, t.nova, t.actualitzada)}<b>${esc(t.titol)}</b>${xifra(t)}</span>
 	</button>`;
 
 // on són els diners: una barra repartida i la llegenda amb els euros (el mateix que a Reshi)
@@ -573,16 +587,19 @@ function vistaMercat() {
 			.map((x) => {
 				const d = dia(x.data);
 				const pr = x.polymarket?.ara;
-				return `<li><span class="m-data"><small>${DIES_CURTS[d.getDay()]}</small><b>${d.getDate()}</b><small>${MESOS[d.getMonth()]}</small></span>
-			<div><h3>${esc(x.titol)}</h3>
+				const fet = x.resultat
+					? `<div class="m-resultat"><b>${x.resultat.com_esperat ? 'Ha passat el que s’esperava' : 'Sorpresa'}</b><p>${esc(x.resultat.text)}</p></div>`
+					: '';
+				return `<li class="${fet ? 'passat' : ''}"><span class="m-data"><small>${DIES_CURTS[d.getDay()]}</small><b>${d.getDate()}</b><small>${MESOS[d.getMonth()]}</small></span>
+			<div><h3>${esc(x.titol)}</h3>${fet}
 			${
-				pr
+				pr && !fet
 					? `<a class="m-aposta" href="${esc(pr.url)}" target="_blank" rel="noopener"><span class="m-aposta-barra"><i style="width:${Math.round(pr.probabilitat * 100)}%"></i></span>
 				<span><b>${Math.round(pr.probabilitat * 100)} %</b> aposta ${esc(x.polymarket.text)}</span>
 				<small>Polymarket · ${diners(pr.volum)} apostats${pr.volum < 300000 ? ' · hi aposta poca gent: fiable a mitges' : ''}</small></a>`
 					: ''
 			}
-			<p><b>Si passa:</b> ${esc(x.si)}</p><p><b>Si no:</b> ${esc(x.si_no)}</p></div></li>`;
+			${fet ? '' : `<p><b>Si passa:</b> ${esc(x.si)}</p><p><b>Si no:</b> ${esc(x.si_no)}</p>`}</div></li>`;
 			})
 			.join('')}</ol>
 		${
@@ -705,11 +722,13 @@ function vistaLector() {
 			return `<article class="pagina" data-id="${t.id}">
 		${foto(t, 'pagina-foto')}
 		<div class="pagina-cos">
-			${etiqueta(t.tema, t.nova)}
+			${etiqueta(t.tema, t.nova, t.actualitzada)}
 			<h2>${esc(t.titol)}</h2>
+			${abans(t)}
 			${xifra(t, 'xifra gran')}
 			<p class="entradeta">${esc(t.frase)}</p>
-			<section class="explica"><h3>Què passa</h3>${(Array.isArray(t.que_passa) ? t.que_passa : [t.que_passa]).map((x) => `<p>${esc(x)}</p>`).join('')}</section>
+			${haPassat(t)}
+			<section class="explica"><h3>${t.actualitzacions?.length ? 'D’on venia' : 'Què passa'}</h3>${(Array.isArray(t.que_passa) ? t.que_passa : [t.que_passa]).map((x) => `<p>${esc(x)}</p>`).join('')}</section>
 			${t.dades?.length ? `<section><h3>Les dades</h3><dl class="dades">${t.dades.map((d) => `<div><dt>${esc(d.valor)}</dt><dd>${esc(d.que)}</dd></div>`).join('')}</dl></section>` : ''}
 			${
 				t.fotos?.length
@@ -732,8 +751,8 @@ function vistaLector() {
 			<footer class="fonts">${t.fonts.map((f) => `<a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.nom)} ${icona('fletxa', 12)}</a>`).join('')}</footer>
 		</div>
 		<div class="vots">
-			<button type="button" data-vot="1" data-id="${t.id}" aria-pressed="${vot === 1}">${icona('amunt', 18)} M’interessa</button>
-			<button type="button" data-vot="-1" data-id="${t.id}" aria-pressed="${vot === -1}">${icona('avall', 18)} Em sobra</button>
+			<button type="button" data-vot="1" data-id="${t.id}" data-clau="${clau(t)}" aria-pressed="${vot === 1}">${icona('amunt', 18)} M’interessa</button>
+			<button type="button" data-vot="-1" data-id="${t.id}" data-clau="${clau(t)}" aria-pressed="${vot === -1}">${icona('avall', 18)} Em sobra</button>
 		</div>
 	</article>`;
 		})
@@ -769,7 +788,7 @@ function pintar() {
 			const i = Math.round(pistes.scrollLeft / pistes.clientWidth);
 			if (i === estat.lector) return;
 			estat.lector = i;
-			llegir(llistaLector()[i].id);
+			llegir(clau(llistaLector()[i]));
 			document.getElementById('compte').textContent = `${i + 1} / ${llistaLector().length}`;
 			document.querySelectorAll('.lector-punts i').forEach((p, j) => p.classList.toggle('ara', j === i));
 		});
@@ -778,7 +797,7 @@ function pintar() {
 
 function obrirLector(i) {
 	estat.lector = i;
-	llegir(llistaLector()[i].id);
+	llegir(clau(llistaLector()[i]));
 	history.pushState({lector: true}, ''); // el botó d'enrere del mòbil tanca el lector en lloc de sortir de l'app
 	pintar();
 }
@@ -809,7 +828,7 @@ document.addEventListener('click', (ev) => {
 		estat.lectorIds = idsMercat();
 		obrirLector(Math.max(0, estat.lectorIds.indexOf(b.dataset.noticiaMercat)));
 	} else if (b.hasAttribute('data-llegir-totes')) {
-		for (const t of estat.dades.edicio.targetes) estat.vistes.add(t.id);
+		for (const t of estat.dades.edicio.targetes) estat.vistes.add(clau(t));
 		desarVistes();
 		refreshLlegides();
 		pintar();
@@ -835,7 +854,7 @@ document.addEventListener('click', (ev) => {
 		// treure un vot és un 0 (no esborrar-lo): així Reshi també el treu
 		estat.vots[id] = estat.vots[id] === v ? 0 : v;
 		guardat.posar('reshi-vots', estat.vots);
-		llegir(id);
+		llegir(b.dataset.clau ?? id);
 		enviarAviat();
 		b.parentElement.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(estat.vots[id] === Number(x.dataset.vot))));
 	}
