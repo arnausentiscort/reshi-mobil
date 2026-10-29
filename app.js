@@ -699,15 +699,21 @@ function vistaVitrina() {
 	${estat.projectes ? '' : formCodi('Què has fet a cada projecte', 'Posa el codi per entrar a cada projecte: què has fet, les decisions i el que falta.')}
 	<div class="vitrina">${v
 		.map(
-			(p) => `<article class="trofeu">
-		<button type="button" class="trofeu-obrir" data-projecte="${p.id}" ${estat.projectes?.[p.id] ? '' : 'disabled'} aria-label="Obrir ${esc(p.titol)}">
-			<span class="medalla">${icona(p.icona, 30)}</span>
+			(p) => {
+				// el que té web obre la web directament; la nota del projecte (amb el codi) queda en un botó petit
+				const cos = `<span class="medalla">${icona(p.icona, 30)}</span>
 			<span class="placa">${esc(PLACA[p.estat] ?? p.estat)}</span>
 			<h2>${esc(p.titol)}</h2>
-			<p>${esc(p.resum)}</p>
-		</button>
-		${p.web ? `<a href="${esc(p.web)}" target="_blank" rel="noopener">Obrir la web ${icona('fletxa', 14)}</a>` : ''}
-	</article>`,
+			<p>${esc(p.resum)}</p>`;
+				return p.web
+					? `<article class="trofeu">
+		<a class="trofeu-obrir" href="${esc(p.web)}" target="_blank" rel="noopener" aria-label="Obrir la web de ${esc(p.titol)}">${cos}<span class="trofeu-web">Obrir la web ${icona('fletxa', 14)}</span></a>
+		${estat.projectes?.[p.id] ? `<button type="button" class="trofeu-nota" data-projecte="${p.id}">Què he fet</button>` : ''}
+	</article>`
+					: `<article class="trofeu">
+		<button type="button" class="trofeu-obrir" data-projecte="${p.id}" ${estat.projectes?.[p.id] ? '' : 'disabled'} aria-label="Obrir ${esc(p.titol)}">${cos}</button>
+	</article>`;
+			},
 		)
 		.join('')}</div>`;
 }
