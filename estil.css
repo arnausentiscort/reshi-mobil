@@ -585,3 +585,17 @@ img { display: block; max-width: 100%; }
 .m-que { font-style: normal; font-weight: 700; }
 .m-que.bo { color: #4ade80; }
 .m-que.dolent { color: #f0716a; }
+
+/* --- La llibreta d'encerts --- */
+.m-llibreta { display: flex; flex-direction: column; gap: 12px; }
+.m-llibreta-llista { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.m-llibreta-llista li { display: grid; grid-template-columns: 26px 1fr; align-items: center; gap: 4px 10px; padding: 9px 2px; border-top: 1px solid var(--vora); }
+.m-llibreta-llista li > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.m-llibreta-llista li > span b { font-size: 14px; }
+.m-llibreta-llista li > span small { color: var(--text-2); font-size: 12.5px; }
+.m-llibreta-canvi { grid-column: 2; font-style: normal; font-size: 12.5px; font-weight: 800; color: var(--text-3); }
+.m-llibreta-canvi.puja { color: #4ade80; }
+.m-llibreta-canvi.baixa { color: #f0716a; }
+.m-llibreta-estat { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; font-size: 13px; background: rgba(255, 255, 255, 0.06); color: var(--text-3); }
+.encert .m-llibreta-estat { background: rgba(74, 222, 128, 0.15); color: #4ade80; }
+.error .m-llibreta-estat { background: rgba(229, 83, 75, 0.15); color: #f0716a; }

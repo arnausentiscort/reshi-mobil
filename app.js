@@ -491,6 +491,34 @@ function laTevaCartera() {
 	</section>`;
 }
 
+// la llibreta d'encerts: les notícies que deien cap on empenyien el MSCI, el bitcoin o l'ethereum, i què ha fet el preu
+// una setmana després (el mateix que a Reshi)
+const ESTAT_LLIBRETA = {encert: '✓', error: '✗', quiet: '–', pendent: '…'};
+function laLlibreta() {
+	const l = estat.dades.llibreta;
+	if (!l?.fets.length) return '';
+	const mirats = l.encerts + l.errors;
+	const primera = l.fets.filter((x) => x.estat === 'pendent').sort((a, b) => a.mira.localeCompare(b.mira))[0];
+	return `<section class="m-bloc">
+		<h2 class="m-titol">Llibreta d’encerts <small>si les notícies han empès cap on deien, una setmana després</small></h2>
+		<div class="m-cartera m-llibreta">
+			<div class="m-cartera-xifres">
+				<div><span>Encerts</span><b>${mirats ? `${l.encerts} de ${mirats}` : '—'}</b><small>${mirats ? `${Math.round((l.encerts / mirats) * 100)} %; a cara o creu seria un 50 %` : 'encara no se n’ha pogut mirar cap'}</small></div>
+				<div><span>Per mirar</span><b>${l.pendents}</b><small>${primera ? `la primera, el ${dataBarra(primera.mira)}` : 'cap'}</small></div>
+				<div><span>Sense moviment</span><b>${l.quiets}</b><small>menys d’un ${l.quiet.toLocaleString('ca-ES')} %: no compten</small></div>
+			</div>
+			<ul class="m-llibreta-llista">${l.fets
+				.map(
+					(x) => `<li class="${x.estat}"><b class="m-llibreta-estat">${ESTAT_LLIBRETA[x.estat]}</b>
+				<span><b>${esc(x.titol)}</b><small>${esc(NOMS_TOCA[x.actiu])}: deia <em class="m-que ${x.efecte}">${esc(x.que)}</em> · ${dataBarra(x.data)}</small></span>
+				<em class="m-llibreta-canvi ${x.canvi == null ? '' : x.canvi >= 0 ? 'puja' : 'baixa'}">${x.canvi != null ? pct(x.canvi) : `es mira el ${dataBarra(x.mira)}`}</em></li>`,
+				)
+				.join('')}</ul>
+			<p class="m-peu">Es compara el preu del dia que va sortir la notícia amb el d’${l.dies} dies després. Un encert no vol dir que la notícia fos la causa (el preu el mouen moltes coses alhora): serveix per veure si la manera d’explicar-ho té sentit.</p>
+		</div>
+	</section>`;
+}
+
 function vistaMercat() {
 	const m = estat.dades.mercat;
 	const s = estat.dades.setmana;
@@ -656,7 +684,7 @@ function vistaMercat() {
 		<span class="sobre">Mercat${s?.data ? ` · setmana del ${dataBarra(s.data)}` : ''}</span>
 		<h1>Com està el mercat</h1>
 	</header>
-	${comEsta}${dinersMeus()}${laTevaCartera()}${perQue}${dinsMsci(estat.dades.msci, m.actius.find((x) => x.id === 'msci')?.canvis.setmana)}${cartera}${apostes}${futur}
+	${comEsta}${dinersMeus()}${laTevaCartera()}${laLlibreta()}${perQue}${dinsMsci(estat.dades.msci, m.actius.find((x) => x.id === 'msci')?.canvis.setmana)}${cartera}${apostes}${futur}
 	<p class="m-peu">L’anàlisi es renova cada diumenge. Reshi analitza i explica: no és un assessor financer.</p>`;
 }
 
