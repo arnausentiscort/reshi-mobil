@@ -62,6 +62,7 @@ const estat = {
 	dades: null,
 	vista: 'noticies',
 	filtre: 'totes',
+	filtreToca: null, // al Mercat: només les notícies que toquen això (msci, btc...)
 	personal: null,
 	privat: null,
 	vots: guardat.llegir('reshi-vots', {}),
@@ -359,7 +360,9 @@ function termo(nom, t, tipus) {
 const idsMercat = () => {
 	const s = estat.dades.setmana;
 	const delsMotius = (s?.causes ?? []).map((x) => x.noticia).filter(Boolean);
-	const altres = estat.dades.edicio.targetes.filter((t) => TEMES_MERCAT.includes(t.tema) && !delsMotius.includes(t.id)).map((t) => t.id);
+	const altres = estat.dades.edicio.targetes
+		.filter((t) => !delsMotius.includes(t.id) && (TEMES_MERCAT.includes(t.tema) || t.toca?.some((x) => MERCAT_TOCA.includes(x.actiu))))
+		.map((t) => t.id);
 	return [...delsMotius, ...altres].filter((id) => estat.dades.edicio.targetes.some((t) => t.id === id));
 };
 const filaNoticia = (t) => `<button type="button" class="m-noticia" data-noticia-mercat="${t.id}">
@@ -459,64 +462,48 @@ function dinersMeus() {
 }
 const signeDiners = (x) => `${x >= 0 ? '+' : '−'}${eur(Math.abs(x))}`;
 
-// les notícies, ordenades per allò que tens o mires: a favor, en contra o depèn, amb la cadena. Que el fons i el compte són
-// seus només es diu amb el codi posat (és el que hi ha a la part xifrada).
-const ES_TEU = {msci: 'el teu pla', compte: 'on tens els diners'};
-const idsCartera = () => [...new Set(perActiu(estat.dades.edicio.targetes).flatMap((g) => g.llista.map((y) => y.t.id)))];
-function laTevaCartera() {
+// el Mercat, més net: una fila amb què li toca a cada cosa que té o mira (en triar-ne una, només queden les notícies
+// d'aquella cosa), les causes de la setmana en targetes grans amb foto, i la llibreta d'encerts plegada en una línia.
+// Que el fons i el compte són seus només es diu amb el codi posat (és el que hi ha a la part xifrada).
+const ES_TEU = {msci: 'el teu pla', compte: 'el teu compte'};
+const MERCAT_TOCA = ['msci', 'btc', 'eth', 'compte'];
+const tocaA = (t, actiu) => !actiu || !!t.toca?.some((x) => x.actiu === actiu);
+function queEtToca() {
 	const grups = perActiu(estat.dades.edicio.targetes);
 	if (!grups.length) return '';
 	const d = estat.diners;
 	const te = new Set(d ? ['compte', ...(d.inversions.length ? ['msci'] : [])] : []);
-	return `<section class="m-bloc">
-		<h2 class="m-titol">Què li fan les notícies al que tens <small>cada notícia, a sota del que toca, i cap a on sol empènyer</small></h2>
-		<div class="m-toca-graella">${grups
-			.map((g) => {
-				const parts = [g.bo ? `${g.bo} a favor` : '', g.dolent ? `${g.dolent} en contra` : '', g.depen ? `${g.depen} depèn` : ''].filter(Boolean).join(' · ');
-				const n = g.bo + g.dolent + g.depen;
-				return `<article class="m-toca-grup ${te.has(g.actiu) ? 'meu' : ''}">
-				<header><b>${esc(NOMS_TOCA[g.actiu])}</b>${te.has(g.actiu) ? `<em class="m-etiq real">${ES_TEU[g.actiu]}</em>` : ''}</header>
-				<div class="m-balanc"><span class="m-balanc-barra" aria-hidden="true">${g.bo ? `<i class="bo" style="flex-grow:${g.bo}"></i>` : ''}${g.depen ? `<i class="depen" style="flex-grow:${g.depen}"></i>` : ''}${g.dolent ? `<i class="dolent" style="flex-grow:${g.dolent}"></i>` : ''}</span>
-					<small>${parts} · ${n === 1 ? '1 notícia' : `${n} notícies`}</small></div>
-				<ul>${g.llista
-					.map(
-						({t, x}) => `<li><button type="button" class="m-toca-fila ${estat.vistes.has(clau(t)) ? 'vista' : ''}" data-noticia-cartera="${t.id}">${pastilla(x, {petit: true, senseNom: true})}
-					<span><b>${esc(t.titol)}</b><small><em class="m-que ${x.efecte}">${esc(x.que)}</em> · ${esc(x.per_que)}</small></span></button></li>`,
-					)
-					.join('')}</ul>
-			</article>`;
-			})
-			.join('')}</div>
-		<p class="m-peu">«A favor» vol dir que la notícia sol empènyer cap amunt el que tens (o abaratir el que vols): és la cadena de causes, no una previsió ni un consell. Els punts de les línies de dalt són el dia que va sortir cada notícia; toca’ls per llegir-la.</p>
-	</section>`;
+	return `<div class="m-que-toca" role="group" aria-label="Què li toca a cada cosa">${grups
+		.map((g) => {
+			const sentit = g.bo > g.dolent ? 'bo' : g.dolent > g.bo ? 'dolent' : 'depen';
+			const text = [g.dolent ? `${g.dolent} en contra` : '', g.bo ? `${g.bo} a favor` : '', g.depen ? `${g.depen} depèn` : ''].filter(Boolean).join(' · ');
+			return `<button type="button" class="m-toca-xip ${sentit} ${estat.filtreToca === g.actiu ? 'triat' : ''} ${te.has(g.actiu) ? 'meu' : ''}" data-filtre-toca="${g.actiu}" aria-pressed="${estat.filtreToca === g.actiu}">
+			<span><b>${esc(NOMS_TOCA[g.actiu])}</b>${te.has(g.actiu) ? `<small>${ES_TEU[g.actiu]}</small>` : ''}</span>
+			<span class="m-balanc-barra" aria-hidden="true">${g.bo ? `<i class="bo" style="flex-grow:${g.bo}"></i>` : ''}${g.depen ? `<i class="depen" style="flex-grow:${g.depen}"></i>` : ''}${g.dolent ? `<i class="dolent" style="flex-grow:${g.dolent}"></i>` : ''}</span>
+			<em>${text}</em></button>`;
+		})
+		.join('')}</div>`;
 }
 
-// la llibreta d'encerts: les notícies que deien cap on empenyien el MSCI, el bitcoin o l'ethereum, i què ha fet el preu
-// una setmana després (el mateix que a Reshi)
 const ESTAT_LLIBRETA = {encert: '✓', error: '✗', quiet: '–', pendent: '…'};
 function laLlibreta() {
 	const l = estat.dades.llibreta;
 	if (!l?.fets.length) return '';
 	const mirats = l.encerts + l.errors;
 	const primera = l.fets.filter((x) => x.estat === 'pendent').sort((a, b) => a.mira.localeCompare(b.mira))[0];
-	return `<section class="m-bloc">
-		<h2 class="m-titol">Llibreta d’encerts <small>si les notícies han empès cap on deien, una setmana després</small></h2>
-		<div class="m-cartera m-llibreta">
-			<div class="m-cartera-xifres">
-				<div><span>Encerts</span><b>${mirats ? `${l.encerts} de ${mirats}` : '—'}</b><small>${mirats ? `${Math.round((l.encerts / mirats) * 100)} %; a cara o creu seria un 50 %` : 'encara no se n’ha pogut mirar cap'}</small></div>
-				<div><span>Per mirar</span><b>${l.pendents}</b><small>${primera ? `la primera, el ${dataBarra(primera.mira)}` : 'cap'}</small></div>
-				<div><span>Sense moviment</span><b>${l.quiets}</b><small>menys d’un ${l.quiet.toLocaleString('ca-ES')} %: no compten</small></div>
-			</div>
-			<ul class="m-llibreta-llista">${l.fets
-				.map(
-					(x) => `<li class="${x.estat}"><b class="m-llibreta-estat">${ESTAT_LLIBRETA[x.estat]}</b>
-				<span><b>${esc(x.titol)}</b><small>${esc(NOMS_TOCA[x.actiu])}: deia <em class="m-que ${x.efecte}">${esc(x.que)}</em> · ${dataBarra(x.data)}</small></span>
-				<em class="m-llibreta-canvi ${x.canvi == null ? '' : x.canvi >= 0 ? 'puja' : 'baixa'}">${x.canvi != null ? pct(x.canvi) : `es mira el ${dataBarra(x.mira)}`}</em></li>`,
-				)
-				.join('')}</ul>
-			<p class="m-peu">Es compara el preu del dia que va sortir la notícia amb el d’${l.dies} dies després. Un encert no vol dir que la notícia fos la causa (el preu el mouen moltes coses alhora): serveix per veure si la manera d’explicar-ho té sentit.</p>
-		</div>
-	</section>`;
+	return `<details class="m-llibreta">
+		<summary><span class="m-llibreta-marcador">${mirats ? `${l.encerts}/${mirats}` : '—'}</span>
+			<span><b>Llibreta d’encerts</b><small>${mirats ? `${Math.round((l.encerts / mirats) * 100)} % d’encerts (a cara o creu, un 50 %)` : 'Encara no se n’ha pogut mirar cap'}${primera ? ` · ${l.pendents} per mirar, la primera el ${dataBarra(primera.mira)}` : ''}</small></span>
+			<i class="m-llibreta-fletxa">⌄</i></summary>
+		<ul class="m-llibreta-llista">${l.fets
+			.map(
+				(x) => `<li class="${x.estat}"><b class="m-llibreta-estat">${ESTAT_LLIBRETA[x.estat]}</b>
+			<span><b>${esc(x.titol)}</b><small>${esc(NOMS_TOCA[x.actiu])}: deia <em class="m-que ${x.efecte}">${esc(x.que)}</em> · ${dataBarra(x.data)}</small></span>
+			<em class="m-llibreta-canvi ${x.canvi == null ? '' : x.canvi >= 0 ? 'puja' : 'baixa'}">${x.canvi != null ? pct(x.canvi) : `es mira el ${dataBarra(x.mira)}`}</em></li>`,
+			)
+			.join('')}</ul>
+		<p class="m-peu">Compara el preu del dia que va sortir la notícia amb el d’${l.dies} dies després. Un encert no vol dir que la notícia en fos la causa: serveix per veure si la manera d’explicar-ho té sentit.</p>
+	</details>`;
 }
 
 function vistaMercat() {
@@ -545,18 +532,27 @@ function vistaMercat() {
 	</div>
 	<p class="m-peu">Preus del ${dataBarra(m.actualitzat.slice(0, 10))} a les ${m.actualitzat.slice(11)}.</p>`;
 
+	const f = estat.filtreToca;
 	const lligades = new Set((s?.causes ?? []).map((x) => x.noticia));
-	const altres = estat.dades.edicio.targetes.filter((t) => TEMES_MERCAT.includes(t.tema) && !lligades.has(t.id));
+	const altres = estat.dades.edicio.targetes.filter((t) => !lligades.has(t.id) && (TEMES_MERCAT.includes(t.tema) || t.toca?.some((x) => MERCAT_TOCA.includes(x.actiu))) && tocaA(t, f));
+	const causes = (s?.causes ?? []).map((x, i) => ({x, i, n: noticia(x.noticia)})).filter(({n}) => !f || (n && tocaA(n, f)));
 	const perQue = s?.causes?.length
 		? `<section class="m-bloc">
 		<h2 class="m-titol">Per què està així</h2>
-		<ol class="m-causes">${s.causes
-			.map((x, i) => {
-				const n = noticia(x.noticia);
-				return `<li><span class="m-num">${i + 1}</span><div><h3>${esc(x.titol)}</h3><p>${esc(x.text)}</p>${n ? filaNoticia(n) : ''}</div></li>`;
-			})
-			.join('')}</ol>
-		${altres.length ? `<h3 class="etiqueta">${icona('noticies', 12)} Altres notícies de mercat</h3><div class="m-altres">${altres.map(filaNoticia).join('')}</div>` : ''}
+		${queEtToca()}
+		<div class="m-causes-grans">${causes
+			.map(
+				({x, i, n}) => `<button type="button" class="m-causa ${n?.imatge ? 'amb-foto' : ''} ${n && estat.vistes.has(clau(n)) ? 'vista' : ''}" ${n ? `data-noticia-mercat="${n.id}"` : 'disabled'}>
+			${n?.imatge ? `<img src="${esc(n.imatge)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}
+			<span class="m-causa-cos"><span class="m-num">${i + 1}</span><h3>${esc(x.titol)}</h3>
+			${n?.xifra ? `<span class="m-causa-xifra"><b>${esc(n.xifra.valor)}</b><small>${esc(n.xifra.que)}</small></span>` : ''}
+			<p>${esc(x.text)}</p>
+			${n?.toca?.length ? `<span class="toques">${n.toca.filter((y) => MERCAT_TOCA.includes(y.actiu) || y.actiu === f).map((y) => pastilla(y, {petit: true})).join('')}</span>` : ''}</span>
+		</button>`,
+			)
+			.join('')}</div>
+		${altres.length ? `<h3 class="etiqueta">${icona('noticies', 12)} També aquesta setmana</h3><div class="m-altres">${altres.map(filaNoticia).join('')}</div>` : ''}
+		${f && !causes.length && !altres.length ? `<p class="m-peu">Aquesta setmana no hi ha cap notícia de mercat que toqui ${esc(NOMS_TOCA[f])}.</p>` : ''}
 	</section>`
 		: '';
 
@@ -684,7 +680,7 @@ function vistaMercat() {
 		<span class="sobre">Mercat${s?.data ? ` · setmana del ${dataBarra(s.data)}` : ''}</span>
 		<h1>Com està el mercat</h1>
 	</header>
-	${comEsta}${dinersMeus()}${laTevaCartera()}${laLlibreta()}${perQue}${dinsMsci(estat.dades.msci, m.actius.find((x) => x.id === 'msci')?.canvis.setmana)}${cartera}${apostes}${futur}
+	${comEsta}${dinersMeus()}${perQue}${laLlibreta()}${dinsMsci(estat.dades.msci, m.actius.find((x) => x.id === 'msci')?.canvis.setmana)}${cartera}${apostes}${futur}
 	<p class="m-peu">L’anàlisi es renova cada diumenge. Reshi analitza i explica: no és un assessor financer.</p>`;
 }
 
@@ -900,8 +896,9 @@ document.addEventListener('click', (ev) => {
 		estat.lectorIds = idsMercat();
 		obrirLector(Math.max(0, estat.lectorIds.indexOf(b.dataset.noticiaMercat)));
 	} else if (b.dataset.noticiaCartera) {
-		// des de la cartera o d'un punt d'una línia: el lector passa les notícies que toquen alguna cosa seva
-		estat.lectorIds = idsCartera();
+		// des d'un punt d'una línia: el lector passa les notícies del Mercat, començant per la clicada
+		estat.lectorIds = idsMercat();
+		if (!estat.lectorIds.includes(b.dataset.noticiaCartera)) estat.lectorIds.unshift(b.dataset.noticiaCartera);
 		obrirLector(Math.max(0, estat.lectorIds.indexOf(b.dataset.noticiaCartera)));
 	} else if (b.hasAttribute('data-llegir-totes')) {
 		for (const t of estat.dades.edicio.targetes) estat.vistes.add(clau(t));
@@ -914,6 +911,9 @@ document.addEventListener('click', (ev) => {
 		if (!obert) history.pushState({projecte: true}, ''); // el botó d'enrere torna a la vitrina
 		pintar();
 		document.querySelector('.fitxa')?.scrollTo(0, 0);
+	} else if (b.dataset.filtreToca) {
+		estat.filtreToca = estat.filtreToca === b.dataset.filtreToca ? null : b.dataset.filtreToca;
+		pintar();
 	} else if (b.dataset.filtre) {
 		estat.filtre = b.dataset.filtre;
 		pintar();

@@ -1,6 +1,6 @@
 // Perquè el mòbil la deixi instal·lar com una app i s'obri sense connexió: primer la xarxa (així sempre surt l'última
 // edició) i, si no n'hi ha, el que es va veure l'últim cop.
-const CAIXA = 'reshi-v9';
+const CAIXA = 'reshi-v10';
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
