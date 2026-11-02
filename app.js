@@ -90,6 +90,11 @@ const estat = {
 	activitat: guardat.llegir('reshi-activitat', []), // els passos i el gimnàs que encara no han arribat a Reshi
 	activitatReshi: null, // el que ja té Reshi (del privat.json): dies, objectius i partits
 	desat: null, // l'avís de dalt quan una drecera acaba de desar alguna cosa
+	coses: guardat.llegir('reshi-coses', []), // els canvis a la llista que encara no han arribat a Reshi
+	cosesReshi: null, // la llista que té Reshi (del privat.json)
+	filtreLlista: 'tot', // tot, meu, regals o l'id d'un projecte
+	editantCosa: null,
+	carta: false, // la carta de regals oberta
 };
 const desarVistes = () => guardat.posar('reshi-vistes', [...estat.vistes]);
 const llegir = (id) => {
@@ -128,6 +133,11 @@ const aplicar = (obert) => {
 			(a.pantalla && Object.entries(a.pantalla).some(([k, v]) => (jaHi[a.dia]?.pantalla?.[k] ?? -1) < v)),
 	);
 	guardat.posar('reshi-activitat', estat.activitat);
+	// i de la llista, els canvis que Reshi ja té (o en té un de més nou)
+	estat.cosesReshi = obert?.coses ?? null;
+	const teReshi = new Map([...(estat.cosesReshi?.coses ?? []), ...(estat.cosesReshi?.esborrades ?? [])].map((c) => [c.id, c.quan ?? '']));
+	estat.coses = estat.coses.filter((c) => !teReshi.has(c.id) || teReshi.get(c.id) < c.quan);
+	guardat.posar('reshi-coses', estat.coses);
 	desarVistes();
 	enviarAviat(0);
 	refreshLlegides();
@@ -275,7 +285,7 @@ function vistaNoticies() {
 // més d'11 hores que es va enviar.
 const NTFY = 'https://ntfy.sh/';
 const TORNAR = 11 * 3600 * 1000;
-const enviats = guardat.llegir('reshi-enviats', {}); // "v:id:vot", "l:id", "n:id", "a:id" -> quan es va enviar
+const enviats = guardat.llegir('reshi-enviats', {}); // "v:id:vot", "l:id", "n:id", "a:id", "c:id:quan" -> quan es va enviar
 const fresc = (k) => Date.now() - (enviats[k] ?? 0) < TORNAR;
 const hex = (b) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, '0')).join('');
 const b64 = (b) => btoa(String.fromCharCode(...new Uint8Array(b)));
@@ -299,12 +309,13 @@ function perEnviar() {
 	const vistes = [...estat.vistes].filter((id) => !estat.vistesReshi.has(id) && !fresc(`l:${id}`)).slice(0, 80);
 	const notes = estat.notes.filter((n) => !fresc(`n:${n.id}`));
 	const activitat = estat.activitat.filter((a) => !fresc(`a:${a.id}`));
-	return {vots, vistes, notes, activitat};
+	const coses = estat.coses.filter((c) => !fresc(`c:${c.id}:${c.quan}`));
+	return {vots, vistes, notes, activitat, coses};
 }
 let enviant = false;
 async function enviar() {
 	const p = perEnviar();
-	if (enviant || (!Object.keys(p.vots).length && !p.vistes.length && !p.notes.length && !p.activitat.length)) return;
+	if (enviant || (!Object.keys(p.vots).length && !p.vistes.length && !p.notes.length && !p.activitat.length && !p.coses.length)) return;
 	const b = await obrirBustia().catch(() => null);
 	if (!b) return;
 	enviant = true;
@@ -318,6 +329,7 @@ async function enviar() {
 		for (const id of p.vistes) enviats[`l:${id}`] = ara;
 		for (const n of p.notes) enviats[`n:${n.id}`] = ara;
 		for (const a of p.activitat) enviats[`a:${a.id}`] = ara;
+		for (const c of p.coses) enviats[`c:${c.id}:${c.quan}`] = ara;
 		for (const [k, t] of Object.entries(enviats)) if (ara - t > 3 * 86400000) delete enviats[k];
 		guardat.posar('reshi-enviats', enviats);
 		estat.bustia = p.notes.length ? 'Enviat a Reshi.' : '';
@@ -572,6 +584,8 @@ function vistaAvui() {
 	<div class="resum-fitxes">
 		<button type="button" data-vista="noticies">${icona('noticies', 20)}<b>${n ? `${n} ${n === 1 ? 'nova' : 'noves'}` : 'Al dia'}</b><small>Notícies</small></button>
 		<button type="button" data-vista="mercat">${icona('mercat', 20)}<b>${estat.diners ? eur(estat.diners.total) : msci ? pct(msci.canvis.setmana) : '—'}</b><small>${estat.diners ? 'Els teus diners' : 'El MSCI World, la setmana'}</small></button>
+		<button type="button" data-vista="llista">${icona('llista', 20)}<b>${dadesCoses().coses.filter((c) => c.estat !== 'comprada').length}</b><small>Coses per comprar</small></button>
+		<button type="button" data-vista="vitrina">${icona('vitrina', 20)}<b>Vitrina</b><small>El que has fet</small></button>
 	</div>
 	${votsPerPassar()}`;
 }
@@ -593,6 +607,98 @@ function vistaActivitat() {
 	<section class="activitat"><h2 class="etiqueta">${icona('mobil', 12)} Temps de pantalla</h2>${pantallaSetmana(a)}<p class="act-llegenda"><span><i class="xarxes"></i>Xarxes</span><span><i class="jocs"></i>Jocs</span></p></section>
 	<section class="activitat"><h2 class="etiqueta">${icona('calendari', 12)} El mes</h2>${mesQuadrets(a)}</section>`;
 }
+
+// --- La llista de coses: el que vol comprar per a cada projecte, el que necessita ell i la carta de regals (la mateixa
+// llista que a Reshi). El que s'afegeix o es canvia aquí va a una cua i arriba a Reshi per la bústia; de cada cosa mana el
+// canvi més nou ("quan").
+const araISO = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 19);
+const preuEur = (x) => `${x.toLocaleString('ca-ES', {minimumFractionDigits: x % 1 ? 2 : 0, maximumFractionDigits: 2})} €`;
+function canviarCosa(c) {
+	const abans = estat.coses.find((x) => x.id === c.id);
+	estat.coses = [...estat.coses.filter((x) => x.id !== c.id), {...abans, ...c, quan: araISO()}];
+	guardat.posar('reshi-coses', estat.coses);
+	enviarAviat(0);
+}
+// les de Reshi i, a sobre, els canvis que encara són aquí
+function dadesCoses() {
+	const r = estat.cosesReshi;
+	const per = new Map((r?.coses ?? []).map((c) => [c.id, {...c}]));
+	for (const c of estat.coses) {
+		const ja = per.get(c.id);
+		if (!ja || (ja.quan ?? '') <= c.quan) per.set(c.id, {...ja, ...c, ...(c.estat === 'comprada' && ja?.estat !== 'comprada' && {comprada: c.quan.slice(0, 10)})});
+	}
+	const noms = new Map((r?.projectes ?? []).map((p) => [p.id, p.titol]));
+	const coses = [...per.values()].filter((c) => !c.esborrada && c.nom).map((c) => ({...c, projecte_nom: noms.get(c.projecte) ?? c.projecte_nom}));
+	coses.sort((a, b) => (b.creada ?? b.quan ?? '').localeCompare(a.creada ?? a.quan ?? ''));
+	return {coses, projectes: r?.projectes ?? []};
+}
+const formCosa = (c, projectes) => `<form class="ll-form ${c ? 'editant' : ''}" id="${c ? 'form-cosa-edit' : 'form-cosa'}" ${c ? `data-id="${c.id}"` : ''}>
+		<div class="ll-fila"><input name="nom" value="${esc(c?.nom ?? '')}" placeholder="Què vols? (p. ex. imants de 6 mm)" required maxlength="300" autocomplete="off"><button type="submit">${c ? 'Desar' : 'Afegir'}</button></div>
+		<details ${c ? 'open' : ''}><summary>Preu, projecte, regal…</summary>
+			<div class="ll-mes">
+				<input name="preu" value="${c?.preu != null ? String(c.preu).replace('.', ',') : ''}" placeholder="Preu €" inputmode="decimal">
+				<select name="projecte"><option value="">Per a mi</option>${projectes.map((p) => `<option value="${esc(p.id)}" ${c?.projecte === p.id ? 'selected' : ''}>${esc(p.titol)}</option>`).join('')}</select>
+				<input name="enllac" value="${esc(c?.enllac ?? '')}" placeholder="Enllaç (opcional)" inputmode="url">
+				<label class="ll-regal"><input type="checkbox" name="regal" ${c?.regal ? 'checked' : ''}>${icona('regal', 15)} És un regal que vull</label>
+				${c ? `<button type="button" class="ll-cancel" data-editar="">Cancel·lar</button>` : ''}
+			</div>
+		</details>
+	</form>`;
+function vistaLlista() {
+	const cap = `<header class="cap"><span class="sobre">Llista</span><h1>El que vols</h1><p>Per a cada projecte, el que necessites tu i la carta de regals. Quan una cosa es compra, compta a les despeses del projecte.</p></header>`;
+	if (!estat.personal) return `${cap}${formCodi('La teva llista', 'Posa el codi per veure-la i afegir-hi coses.')}`;
+	const {coses, projectes} = dadesCoses();
+	const f = estat.filtreLlista;
+	const dins = f === 'meu' ? coses.filter((c) => !c.projecte && !c.regal) : f === 'regals' ? coses.filter((c) => c.regal) : f !== 'tot' ? coses.filter((c) => c.projecte === f) : coses;
+	const vull = dins.filter((c) => c.estat !== 'comprada');
+	const comprades = dins.filter((c) => c.estat === 'comprada').sort((a, b) => (b.comprada ?? '').localeCompare(a.comprada ?? ''));
+	const regals = coses.filter((c) => c.regal && c.estat !== 'comprada');
+	const suma = (l) => l.reduce((t, c) => t + (c.preu ?? 0), 0);
+	const filtres = [
+		['tot', 'Tot', coses.filter((c) => c.estat !== 'comprada').length],
+		['meu', 'Per a mi', coses.filter((c) => !c.projecte && !c.regal && c.estat !== 'comprada').length],
+		['regals', 'Regals', regals.length],
+		...projectes.filter((p) => coses.some((c) => c.projecte === p.id)).map((p) => [p.id, p.titol, coses.filter((c) => c.projecte === p.id && c.estat !== 'comprada').length]),
+	];
+	const fila = (c) =>
+		estat.editantCosa === c.id
+			? `<li class="ll-cosa editant">${formCosa(c, projectes)}</li>`
+			: `<li class="ll-cosa ${c.estat === 'comprada' ? 'comprada' : ''}">
+			<button type="button" class="ll-check" data-comprar="${c.id}" aria-pressed="${c.estat === 'comprada'}" aria-label="${c.estat === 'comprada' ? 'Tornar a «la vull»' : 'Marcar comprada'}">${c.estat === 'comprada' ? icona('fet', 14) : ''}</button>
+			<button type="button" class="ll-text" data-editar="${c.id}"><b>${esc(c.nom)}</b><small>${c.regal ? `<span class="ll-xip regal">${icona('regal', 11)} Regal</span>` : ''}${c.projecte_nom ? `<span class="ll-xip">${esc(c.projecte_nom)}</span>` : ''}${!c.projecte && !c.regal ? '<span class="ll-xip meu">Per a mi</span>' : ''}</small></button>
+			${c.enllac && /^https:\/\//.test(c.enllac) ? `<a class="ll-icona" href="${esc(c.enllac)}" target="_blank" rel="noopener" aria-label="Obrir l’enllaç">${icona('fletxa', 15)}</a>` : ''}
+			<span class="ll-preu">${c.preu != null ? preuEur(c.preu) : ''}</span>
+			<button type="button" class="ll-icona" data-esborrar="${c.id}" aria-label="Esborrar ${esc(c.nom)}">${icona('paperera', 15)}</button>
+		</li>`;
+	return `${cap}
+	<section class="activitat">${formCosa(null, projectes)}</section>
+	<nav class="filtres" aria-label="Filtres de la llista">${filtres.map(([id, nom, n]) => `<button type="button" data-filtre-llista="${esc(id)}" aria-pressed="${f === id}">${esc(nom)} <small>${n}</small></button>`).join('')}</nav>
+	${regals.length ? `<button type="button" class="act-mes-boto" data-carta>${icona('regal', 16)} Carta de regals (${regals.length})</button>` : ''}
+	<p class="ll-xifres"><span><b>${vull.length}</b> per comprar${suma(vull) ? ` · ${preuEur(suma(vull))}` : ''}</span><span>Gastat: <b>${preuEur(suma(comprades))}</b></span></p>
+	${vull.length ? `<ul class="ll-llista">${vull.map(fila).join('')}</ul>` : '<p class="buit">Res per comprar aquí.</p>'}
+	${comprades.length ? `<details class="ll-comprades"><summary>${icona('fet', 13)} ${comprades.length} ${comprades.length === 1 ? 'comprada' : 'comprades'}</summary><ul class="ll-llista">${comprades.map(fila).join('')}</ul></details>` : ''}`;
+}
+// la carta de regals: un full net, sense res de l'app, per fer-ne una captura
+function vistaCarta() {
+	const regals = dadesCoses().coses.filter((c) => c.regal && c.estat !== 'comprada');
+	return `<div class="ll-carta" role="dialog" aria-modal="true" aria-label="Carta de regals">
+		<button type="button" class="rodo" data-tancar-carta aria-label="Tancar">${icona('tancar', 18)}</button>
+		<div class="ll-carta-paper">${icona('regal', 30)}<h1>La meva carta de regals</h1><p>Arnau</p>
+			<ol>${regals.map((c) => `<li><b>${esc(c.nom)}</b>${c.preu != null ? `<span>${preuEur(c.preu)}</span>` : ''}${c.enllac ? `<small>${esc(c.enllac.replace(/^https?:\/\/(www\.)?/, '').split('/')[0])}</small>` : ''}</li>`).join('')}</ol>
+		</div>
+	</div>`;
+}
+const llegirFormCosa = (form) => {
+	const d = new FormData(form);
+	const preu = String(d.get('preu') ?? '').trim().replace(',', '.');
+	return {
+		nom: String(d.get('nom') ?? '').trim(),
+		preu: preu && Number.isFinite(Number(preu)) ? Number(preu) : null,
+		projecte: String(d.get('projecte') ?? '') || null,
+		enllac: String(d.get('enllac') ?? '').trim() || null,
+		regal: d.get('regal') === 'on',
+	};
+};
 
 // el formulari per enviar una nota a Reshi (una idea, un tema que vol seguir, una compra...): només amb el codi posat
 function votsPerPassar() {
@@ -1123,15 +1229,16 @@ function pintar() {
 	}
 	app.innerHTML = `
 	<div class="marca"><img src="icona-192.png" alt=""><b>RESHI</b><button type="button" class="mode" data-mode aria-label="${modeClar() ? 'Passar al mode fosc' : 'Passar al mode clar'}">${icona(modeClar() ? 'lluna' : 'sol', 16)}</button>${estat.personal ? `<span class="obert" title="La part personal està oberta">${icona('obert', 13)}</span>` : ''}</div>
-	<main class="pantalla">${avisDesat()}${{avui: vistaAvui, activitat: vistaActivitat, noticies: vistaNoticies, mercat: vistaMercat, vitrina: vistaVitrina}[estat.vista]()}</main>
+	<main class="pantalla">${avisDesat()}${{avui: vistaAvui, activitat: vistaActivitat, llista: vistaLlista, noticies: vistaNoticies, mercat: vistaMercat, vitrina: vistaVitrina}[estat.vista]()}</main>
 	<nav class="pestanyes" aria-label="Seccions">
 		<button type="button" data-vista="avui" aria-pressed="${estat.vista === 'avui'}">${icona('espurna', 20)}<span>Avui</span></button>
 		<button type="button" data-vista="activitat" aria-pressed="${estat.vista === 'activitat'}">${icona('peus', 20)}<span>Activitat</span></button>
+		<button type="button" data-vista="llista" aria-pressed="${estat.vista === 'llista'}">${icona('llista', 20)}<span>Llista</span></button>
 		<button type="button" data-vista="noticies" aria-pressed="${estat.vista === 'noticies'}">${icona('noticies', 20)}<span>Notícies</span>${estat.dades && noves() ? `<i class="pastilla">${noves()}</i>` : ''}</button>
 		<button type="button" data-vista="mercat" aria-pressed="${estat.vista === 'mercat'}">${icona('mercat', 20)}<span>Mercat</span></button>
-		<button type="button" data-vista="vitrina" aria-pressed="${estat.vista === 'vitrina'}">${icona('vitrina', 20)}<span>Vitrina</span></button>
 	</nav>
 	${estat.lector !== null ? vistaLector() : ''}
+	${estat.carta ? vistaCarta() : ''}
 	${estat.projecte && estat.projectes?.[estat.projecte] ? vistaProjecte() : ''}`;
 	document.body.classList.toggle('llegint', estat.lector !== null || !!estat.projecte);
 	if (estat.lector !== null) {
@@ -1185,6 +1292,26 @@ document.addEventListener('click', (ev) => {
 		estat.lectorIds = idsMercat();
 		if (!estat.lectorIds.includes(b.dataset.noticiaCartera)) estat.lectorIds.unshift(b.dataset.noticiaCartera);
 		obrirLector(Math.max(0, estat.lectorIds.indexOf(b.dataset.noticiaCartera)));
+	} else if (b.dataset.comprar) {
+		const c = dadesCoses().coses.find((x) => x.id === b.dataset.comprar);
+		if (c) canviarCosa({id: c.id, estat: c.estat === 'comprada' ? 'vull' : 'comprada'});
+		pintar();
+	} else if (b.dataset.esborrar) {
+		const c = dadesCoses().coses.find((x) => x.id === b.dataset.esborrar);
+		if (c && confirm(`Esborrar «${c.nom}» de la llista?`)) canviarCosa({id: c.id, esborrada: true});
+		pintar();
+	} else if (b.dataset.editar !== undefined) {
+		estat.editantCosa = b.dataset.editar || null;
+		pintar();
+	} else if (b.dataset.filtreLlista) {
+		estat.filtreLlista = b.dataset.filtreLlista;
+		pintar();
+	} else if (b.hasAttribute('data-carta')) {
+		estat.carta = true;
+		pintar();
+	} else if (b.hasAttribute('data-tancar-carta')) {
+		estat.carta = false;
+		pintar();
 	} else if (b.dataset.mes) {
 		estat.mesAct = Math.min(0, estat.mesAct + Number(b.dataset.mes));
 		pintar();
@@ -1228,6 +1355,18 @@ document.addEventListener('click', (ev) => {
 		enviarAviat();
 		b.parentElement.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(estat.vots[id] === Number(x.dataset.vot))));
 	}
+});
+
+document.addEventListener('submit', (ev) => {
+	if (ev.target.id !== 'form-cosa' && ev.target.id !== 'form-cosa-edit') return;
+	ev.preventDefault();
+	const c = llegirFormCosa(ev.target);
+	if (!c.nom) return;
+	if (ev.target.id === 'form-cosa') canviarCosa({...c, id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`, estat: 'vull', creada: araISO()});
+	else canviarCosa({...c, id: ev.target.dataset.id});
+	estat.editantCosa = null;
+	pintar();
+	document.querySelector('#form-cosa input[name="nom"]')?.focus();
 });
 
 document.addEventListener('submit', (ev) => {
