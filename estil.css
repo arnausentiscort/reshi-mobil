@@ -470,7 +470,7 @@ img { display: block; max-width: 100%; }
 .m-actiu, .m-termo, .m-cartera-xifres > div, .m-resum, .m-futur > li, .m-cartera, .m-mapa, .m-qui, .m-dos-barres, .m-causes > li { position: relative; isolation: isolate; }
 .m-actiu::after, .m-termo::after, .m-cartera-xifres > div::after, .m-resum::after, .m-futur > li::after, .m-cartera::after, .m-mapa::after, .m-qui::after, .m-dos-barres::after, .m-causes > li::after {
 	content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity 0.35s ease;
-	background: radial-gradient(340px circle at var(--x, 50%) var(--y, 0%), rgba(var(--or-rgb), 0.11), transparent 65%);
+	background: radial-gradient(220px circle at var(--x, 50%) var(--y, 0%), rgba(var(--or-rgb), 0.04), transparent 65%);
 }
 .m-actiu, .m-termo, .m-cartera-xifres > div, .m-futur > li, .m-causes > li, .portada, .fila, .m-noticia, .m-aposta, .filtres button { transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1), box-shadow 0.3s, background 0.3s, opacity 0.2s; }
 /* al mòbil: en tocar s'enfonsa una mica */
@@ -480,8 +480,8 @@ img { display: block; max-width: 100%; }
 	.m-actiu:hover, .m-termo:hover, .m-cartera-xifres > div:hover, .m-futur > li:hover { transform: translateY(-3px); }
 	.m-actiu.puja:hover { box-shadow: inset 0 0 0 1px rgba(74, 222, 128, 0.45), 0 18px 36px -20px rgba(74, 222, 128, 0.45); }
 	.m-actiu.baixa:hover { box-shadow: inset 0 0 0 1px rgba(229, 83, 75, 0.45), 0 18px 36px -20px rgba(229, 83, 75, 0.45); }
-	.m-actiu.puja::after { background: radial-gradient(300px circle at var(--x, 50%) var(--y, 0%), rgba(74, 222, 128, 0.12), transparent 65%); }
-	.m-actiu.baixa::after { background: radial-gradient(300px circle at var(--x, 50%) var(--y, 0%), rgba(229, 83, 75, 0.12), transparent 65%); }
+	.m-actiu.puja::after { background: radial-gradient(200px circle at var(--x, 50%) var(--y, 0%), rgba(74, 222, 128, 0.045), transparent 65%); }
+	.m-actiu.baixa::after { background: radial-gradient(200px circle at var(--x, 50%) var(--y, 0%), rgba(229, 83, 75, 0.045), transparent 65%); }
 	.m-actiu:hover .m-preu { text-shadow: 0 0 18px rgba(var(--t), 0.35); }
 	.m-actiu:hover .m-linia polyline { stroke-width: 2.4; }
 	.m-termo:hover, .m-futur > li:hover { box-shadow: inset 0 0 0 1px rgba(var(--or-rgb), 0.35), 0 16px 32px -20px rgba(var(--or-rgb), 0.45); }
@@ -674,7 +674,7 @@ a.trofeu-obrir { text-decoration: none; }
 .act-setmana .gimnas .act-barra { box-shadow: inset 0 0 0 1.5px rgba(var(--or-rgb), 0.6); }
 .act-setmana small { font-size: 11px; font-weight: 700; color: var(--text-3); text-transform: uppercase; }
 .act-setmana .avui small { color: var(--or); }
-.act-setmana em { position: absolute; top: 4px; color: #f0716a; }
+.act-setmana .act-partit { position: absolute; top: 4px; color: #f0716a; }
 .act-peu { margin: 0; font-size: 12.5px; color: var(--text-3); }
 .act-peu b { font-family: var(--mono); color: var(--or); }
 
@@ -724,3 +724,52 @@ a.trofeu-obrir { text-decoration: none; }
 .act-pantalla-llegenda { display: flex; gap: 14px; font-size: 12px; color: var(--text-2); }
 .act-pantalla-llegenda span { display: inline-flex; align-items: center; gap: 6px; }
 .act-pantalla-llegenda i { width: 8px; height: 8px; border-radius: 50%; }
+
+/* ---- Avui i Activitat: l'activitat en gran ---- */
+.act-cap.gran { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 16px; }
+.act-anell-gran { position: relative; display: grid; place-items: center; width: 132px; height: 132px; }
+.act-anell-gran .act-anell { width: 132px; height: 132px; }
+.act-anell-gran .act-anell circle { stroke-width: 10; }
+.act-anell-gran > span { position: absolute; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.act-anell-gran b { font-family: var(--mono); font-size: 25px; font-weight: 800; line-height: 1.1; color: var(--fort); }
+.act-anell-gran small { font-size: 10.5px; color: var(--text-3); }
+.act-anell-gran small:first-child { font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--or); }
+.act-gimnas.gran { width: auto; height: 100%; min-height: 110px; justify-content: center; gap: 6px; padding: 14px 10px; border-radius: 16px; font-size: 14px; }
+.act-gimnas.gran b { font-weight: 800; color: inherit; }
+.act-gimnas.gran small { font-size: 11.5px; font-weight: 500; opacity: 0.75; }
+.act-mes-boto { display: flex; align-items: center; justify-content: center; gap: 6px; height: 42px; border: 0; border-radius: 12px; font-weight: 700; color: var(--or); background: rgba(var(--or-rgb), 0.1); box-shadow: inset 0 0 0 1px rgba(var(--or-rgb), 0.25); }
+.activitat > .etiqueta { margin-bottom: -4px; }
+.act-setmana.gran { gap: 7px; }
+.act-setmana.gran .act-barra { position: relative; height: 130px; border-radius: 10px; }
+.act-setmana.gran.pantalla .act-barra { height: 110px; }
+.act-num { font-family: var(--mono); font-size: 10.5px; font-weight: 800; color: var(--text-2); min-height: 14px; }
+.act-setmana .passat .act-num { color: var(--dolent); }
+.act-meta { position: absolute; left: 0; right: 0; height: 0; border-top: 1.5px dashed rgba(var(--or-rgb), 0.65); z-index: 1; }
+.act-pila { display: flex; flex-direction: column; width: 100%; border-radius: 9px; overflow: hidden; }
+.act-pila .xarxes, .act-llegenda .xarxes { background: var(--xarxes); }
+.act-pila .jocs, .act-llegenda .jocs { background: var(--jocs); }
+.act-llegenda { display: flex; gap: 14px; margin: 0; font-size: 12px; color: var(--text-2); }
+.act-llegenda span { display: inline-flex; align-items: center; gap: 6px; }
+.act-llegenda i { width: 9px; height: 9px; border-radius: 50%; }
+.act-mes-cap { display: flex; align-items: center; justify-content: space-between; }
+.act-mes-cap b { font-size: 17px; font-weight: 900; color: var(--fort); }
+.rodo-petit { width: 34px; height: 34px; display: grid; place-items: center; border: 0; border-radius: 50%; color: var(--text-2); background: var(--elevat); }
+.rodo-petit:disabled { opacity: 0.35; }
+.act-quadrets { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+.act-quadrets > small { text-align: center; font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--text-3); }
+.act-quadrets .q { position: relative; display: grid; place-items: center; aspect-ratio: 1; border-radius: 9px; font-family: var(--mono); font-size: 11px; font-weight: 800; color: var(--text-3); background: rgba(var(--t), 0.05); }
+.act-quadrets .q.n1 { background: rgba(var(--or-rgb), 0.16); color: var(--text-2); }
+.act-quadrets .q.n2 { background: rgba(var(--or-rgb), 0.32); color: var(--text); }
+.act-quadrets .q.n3 { background: rgba(var(--or-rgb), 0.52); color: var(--fort); }
+.act-quadrets .q.n4 { background: rgba(var(--or-rgb), 0.8); color: #1a1408; }
+.act-quadrets .q.gimnas { box-shadow: 0 0 0 2px var(--panell), 0 0 0 3.5px var(--or); }
+.act-quadrets .q.avui { outline: 1.5px dashed rgba(var(--t), 0.4); outline-offset: 2px; }
+.act-quadrets .q.futur { opacity: 0.35; }
+.act-quadrets .q i { position: absolute; top: 4px; right: 4px; width: 5px; height: 5px; border-radius: 50%; background: #e5534b; }
+/* les fitxes del resum: notícies i diners, o gimnàs i ratxa */
+.resum-fitxes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.resum-fitxes > * { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 14px; border: 0; border-radius: 16px; text-align: left; color: var(--or); background: var(--panell); box-shadow: inset 0 0 0 1px var(--vora); }
+.resum-fitxes b { font-family: var(--mono); font-size: 20px; font-weight: 800; color: var(--fort); }
+.resum-fitxes small { font-size: 12px; color: var(--text-3); }
+/* cinc pestanyes: més estretes */
+.pestanyes button { flex-basis: 72px; }

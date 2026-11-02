@@ -70,7 +70,8 @@ posarMode(guardat.llegir('reshi-mode', 'fosc'));
 
 const estat = {
 	dades: null,
-	vista: 'noticies',
+	vista: 'avui', // la pestanya oberta: avui, activitat, noticies, mercat o vitrina
+	mesAct: 0, // a l'Activitat, el mes dels quadrets (0 = aquest, -1 = el passat...)
 	filtre: 'totes',
 	filtreToca: null, // al Mercat: només les notícies que toquen això (msci, btc...)
 	personal: null,
@@ -234,7 +235,6 @@ function vistaNoticies() {
 		}
 	</div>
 	${estat.personal ? '' : formCodi('La part que va per tu', 'Posa el codi i cada notícia et dirà per què t’importa. El mòbil el recordarà.')}
-	${fitxaActivitat()}
 	${
 		agenda.length
 			? `<section class="agenda" aria-label="Pròximament">
@@ -267,7 +267,7 @@ function vistaNoticies() {
 			? `<button type="button" class="cap-mercat" data-vista="mercat">${icona('mercat', 14)} ${e.targetes.length - meves().length} notícies de mercat: són al Mercat, al costat dels preus</button>`
 			: ''
 	}
-	${votsPerPassar()}`;
+	`;
 }
 
 // --- la bústia: els vots, les llegides i les notes arriben sols a Reshi (bustia.py), xifrats amb el codi, per ntfy.sh
@@ -390,12 +390,26 @@ function minutsPantalla(registre) {
 }
 const temps = (min) => (min < 60 ? `${min} min` : `${Math.floor(min / 60)} h${min % 60 ? ` ${min % 60} min` : ''}`);
 
-// les dreceres: #passos=8420&dia=2026-11-02 (i &pantalla=<el registre>) o #gimnas=1&dia=2026-11-02. Es desa, s'esborra de
-// l'adreça i es diu
+// les dreceres: #passos=8420&dia=2026-11-02 (i &pantalla=<el registre>), #gimnas=1&dia=2026-11-02 o #historial=<un dia
+// per línia>. Es desa, s'esborra de l'adreça i es diu
 function delFragment() {
 	const p = new URLSearchParams(location.hash.slice(1));
-	if (!p.has('passos') && !p.has('gimnas') && !p.has('pantalla')) return;
+	if (!p.has('passos') && !p.has('gimnas') && !p.has('pantalla') && !p.has('historial')) return;
 	history.replaceState(null, '', location.pathname + location.search);
+	// l'historial de passos (una drecera d'un sol cop): una línia per dia, "2026-10-03 8420"
+	if (p.has('historial')) {
+		let n = 0;
+		for (const l of p.get('historial').split(/[\r\n]+/)) {
+			const [d, x] = l.trim().split(/\s+/);
+			const passos = llegirPassos(x);
+			if (/^20\d\d-\d\d-\d\d$/.test(d ?? '') && passos != null) {
+				apuntar({dia: d, passos});
+				n++;
+			}
+		}
+		estat.desat = {text: n ? `Desat: els passos de ${n} ${n === 1 ? 'dia' : 'dies'}` : 'L’historial no portava cap dia', enviat: false};
+		if (!p.has('passos') && !p.has('gimnas') && !p.has('pantalla')) return;
+	}
 	const dia = /^20\d\d-\d\d-\d\d$/.test(p.get('dia') ?? '') ? p.get('dia') : avui();
 	const a = {dia};
 	const passos = p.has('passos') ? llegirPassos(p.get('passos')) : null;
@@ -449,39 +463,135 @@ function pantallaFitxa(dies, limit) {
 		<span class="act-pantalla-llegenda"><span><i class="xarxes"></i>Xarxes ${temps(xarxes)}</span><span><i class="jocs"></i>Jocs ${temps(jocs)}</span></span>
 	</div>`;
 }
-function fitxaActivitat() {
-	if (!estat.personal) return '';
-	const {dies, objectius, partits} = dadesActivitat();
-	const ara = new Date();
-	// la drecera desa els passos a les 23:00: fins llavors, els d'ahir
-	const ahir = diaDe(new Date(ara.getFullYear(), ara.getMonth(), ara.getDate() - 1));
-	const quin = dies[avui()]?.passos != null ? avui() : ahir;
-	const passos = dies[quin]?.passos;
+// --- les pestanyes Avui i Activitat: el resum de l'Arnau i la seva activitat sencera ---
+const sumarDies = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+const dilluns = (d) => sumarDies(d, -((d.getDay() + 6) % 7));
+const setmanaDe = (d) => [...Array(7)].map((_, i) => diaDe(sumarDies(dilluns(d), i)));
+const ahir = () => diaDe(sumarDies(new Date(), -1));
+// els passos que toca ensenyar: els d'avui si ja hi són; si no (la drecera va a les 23:00), els d'ahir
+const passosRecents = (dies) => {
+	const d = dies[avui()]?.passos != null ? avui() : ahir();
+	return {d, quan: d === avui() ? 'Avui' : 'Ahir', passos: dies[d]?.passos};
+};
+const totalPantalla = (p) => (p ? (p.xarxes ?? 0) + (p.jocs ?? 0) : null);
+const mitjana = (llista) => (llista.length ? llista.reduce((t, x) => t + x, 0) / llista.length : null);
+const milers = (x) => `${(x / 1000).toLocaleString('ca-ES', {maximumFractionDigits: x >= 10000 ? 0 : 1})}k`;
+// setmanes seguides complint l'objectiu de gimnàs; la d'ara, si encara no l'ha complert, no trenca la ratxa
+function ratxaGimnas(dies, objectiu) {
+	const primer = Object.keys(dies).sort()[0];
+	if (!primer) return 0;
+	let ratxa = 0;
+	for (let d = dilluns(new Date()), ara = true; diaDe(sumarDies(d, 6)) >= primer; d = sumarDies(d, -7), ara = false) {
+		if (setmanaDe(d).filter((x) => dies[x]?.gimnas).length >= objectiu) ratxa++;
+		else if (!ara) break;
+	}
+	return ratxa;
+}
+
+// el cor de l'activitat: l'anell dels passos, el botó del gimnàs i el temps de pantalla
+function activitatGran({dies, objectius}) {
+	const {quan, passos} = passosRecents(dies);
 	const pc = passos != null ? Math.min(1, passos / objectius.passos) : 0;
-	const R = 30;
+	const R = 52;
 	const L = 2 * Math.PI * R;
-	// la setmana de dilluns a diumenge
-	const dl = new Date(ara.getFullYear(), ara.getMonth(), ara.getDate() - ((ara.getDay() + 6) % 7));
-	const setmana = [...Array(7)].map((_, i) => diaDe(new Date(dl.getFullYear(), dl.getMonth(), dl.getDate() + i)));
-	const max = Math.max(objectius.passos, ...setmana.map((d) => dies[d]?.passos ?? 0));
-	const gimnasos = setmana.filter((d) => dies[d]?.gimnas).length;
 	const gimnasAvui = !!dies[avui()]?.gimnas;
-	return `<section class="activitat" aria-label="Activitat">
-		<div class="act-cap">
-			<svg class="act-anell" viewBox="0 0 72 72" role="img" aria-label="${Math.round(pc * 100)} % de l’objectiu"><circle cx="36" cy="36" r="${R}"/><circle class="ple" cx="36" cy="36" r="${R}" stroke-dasharray="${(pc * L).toFixed(1)} ${L.toFixed(1)}"/></svg>
-			<span class="act-xifra"><small>${quin === avui() ? 'Avui' : 'Ahir'}</small><b>${passos != null ? mil(passos) : '—'}</b><small>${passos != null ? `passos · ${Math.round(pc * 100)} % de ${mil(objectius.passos)}` : 'Encara no han arribat'}</small></span>
-			<button type="button" class="act-gimnas" data-gimnas aria-pressed="${gimnasAvui}">${icona('pesa', 18)}<span>${gimnasAvui ? 'Gimnàs fet' : 'Gimnàs avui'}</span></button>
+	return `<div class="act-cap gran">
+			<div class="act-anell-gran">
+				<svg class="act-anell" viewBox="0 0 120 120" role="img" aria-label="${Math.round(pc * 100)} % de l’objectiu"><circle cx="60" cy="60" r="${R}"/>${pc > 0 ? `<circle class="ple" cx="60" cy="60" r="${R}" stroke-dasharray="${(pc * L).toFixed(1)} ${L.toFixed(1)}"/>` : ''}</svg>
+				<span><small>${quan}</small><b>${passos != null ? mil(passos) : '—'}</b><small>${passos != null ? `${Math.round(pc * 100)} % de ${mil(objectius.passos)}` : 'encara no han arribat'}</small></span>
+			</div>
+			<button type="button" class="act-gimnas gran" data-gimnas aria-pressed="${gimnasAvui}">${icona('pesa', 26)}<b>${gimnasAvui ? 'Gimnàs fet' : 'He anat al gimnàs'}</b><small>${gimnasAvui ? 'toca per treure-ho' : 'un toc i queda apuntat'}</small></button>
 		</div>
-		<ol class="act-setmana">${setmana
-			.map((d) => {
-				const x = dies[d] ?? {};
-				return `<li class="${x.gimnas ? 'gimnas' : ''} ${d === avui() ? 'avui' : ''} ${x.passos >= objectius.passos ? 'complert' : ''}"><span class="act-barra"><i style="height:${x.passos ? Math.max(4, (x.passos / max) * 100) : 0}%"></i></span>
-				<small>${DIES_CURTS[dia(d).getDay()].slice(0, 2)}</small>${partits.has(d) ? `<em title="Partit del Real Tiesada">${icona('escut', 10)}</em>` : ''}</li>`;
-			})
-			.join('')}</ol>
-		<p class="act-peu"><b>${gimnasos} de ${objectius.gimnas}</b> dies de gimnàs aquesta setmana · en daurat, els dies que hi has anat</p>
-		${pantallaFitxa(dies, objectius.pantalla)}
-	</section>`;
+		${pantallaFitxa(dies, objectius.pantalla)}`;
+}
+// la setmana en barres: passos (en daurat els dies de gimnàs, l'escut els partits)
+function barresSetmana({dies, objectius, partits}, gran = false) {
+	const setmana = setmanaDe(new Date());
+	const max = Math.max(objectius.passos * 1.2, ...setmana.map((d) => dies[d]?.passos ?? 0));
+	return `<ol class="act-setmana ${gran ? 'gran' : ''}">${setmana
+		.map((d) => {
+			const x = dies[d] ?? {};
+			return `<li class="${x.gimnas ? 'gimnas' : ''} ${d === avui() ? 'avui' : ''} ${x.passos >= objectius.passos ? 'complert' : ''}">${gran ? `<b class="act-num">${x.passos != null ? milers(x.passos) : ''}</b>` : ''}<span class="act-barra">${gran ? `<em class="act-meta" style="bottom:${(objectius.passos / max) * 100}%"></em>` : ''}<i style="height:${x.passos ? Math.max(4, (x.passos / max) * 100) : 0}%"></i></span>
+			<small>${DIES_CURTS[dia(d).getDay()].slice(0, 2)}</small>${partits.has(d) ? `<em class="act-partit" title="Partit del Real Tiesada">${icona('escut', 10)}</em>` : ''}</li>`;
+		})
+		.join('')}</ol>`;
+}
+// el temps de pantalla de la setmana: xarxes i jocs apilats, amb la ratlla del límit
+function pantallaSetmana({dies, objectius}) {
+	const setmana = setmanaDe(new Date());
+	const limit = objectius.pantalla;
+	const max = Math.max(limit * 1.3, ...setmana.map((d) => totalPantalla(dies[d]?.pantalla) ?? 0));
+	const ara = mitjana(setmana.map((d) => totalPantalla(dies[d]?.pantalla)).filter((x) => x != null));
+	const abans = mitjana(setmanaDe(sumarDies(new Date(), -7)).map((d) => totalPantalla(dies[d]?.pantalla)).filter((x) => x != null));
+	if (ara == null && abans == null) return `<p class="act-peu">Encara no hi ha temps de pantalla: arribarà amb la drecera de la nit, quan les automatitzacions de les apps estiguin muntades.</p>`;
+	return `<ol class="act-setmana gran pantalla">${setmana
+		.map((d) => {
+			const p = dies[d]?.pantalla;
+			const t = totalPantalla(p);
+			return `<li class="${d === avui() ? 'avui' : ''} ${t > limit ? 'passat' : ''}"><b class="act-num">${t != null ? (t >= 60 ? `${Math.floor(t / 60)}h${String(t % 60).padStart(2, '0')}` : `${t}′`) : ''}</b><span class="act-barra"><em class="act-meta" style="bottom:${(limit / max) * 100}%"></em><span class="act-pila" style="height:${t ? (t / max) * 100 : 0}%"><i class="jocs" style="flex-grow:${p?.jocs ?? 0}"></i><i class="xarxes" style="flex-grow:${p?.xarxes ?? 0}"></i></span></span><small>${DIES_CURTS[dia(d).getDay()].slice(0, 2)}</small></li>`;
+		})
+		.join('')}</ol>
+		<p class="act-peu">${ara != null ? `<b>${temps(Math.round(ara))}</b> al dia de mitjana` : 'Aquesta setmana encara res'}${ara != null && abans != null ? ` · ${Math.abs(ara - abans) < 1 ? 'igual que' : `${temps(Math.round(Math.abs(ara - abans)))} ${ara < abans ? 'menys' : 'més'} que`} la setmana passada` : ''} · límit ${temps(limit)}</p>`;
+}
+// el mes en quadrets, com els de GitHub: més color, més passos; vora daurada, gimnàs; punt vermell, partit
+const NOMS_MESOS = ['Gener', 'Febrer', 'Març', 'Abril', 'Maig', 'Juny', 'Juliol', 'Agost', 'Setembre', 'Octubre', 'Novembre', 'Desembre'];
+function mesQuadrets({dies, objectius, partits}) {
+	const ara = new Date();
+	const primer = new Date(ara.getFullYear(), ara.getMonth() + estat.mesAct, 1);
+	const n = new Date(primer.getFullYear(), primer.getMonth() + 1, 0).getDate();
+	const delMes = [...Array(n)].map((_, i) => diaDe(new Date(primer.getFullYear(), primer.getMonth(), i + 1)));
+	const nivell = (p) => (p == null ? 'n0' : p >= objectius.passos ? 'n4' : p >= objectius.passos * 0.75 ? 'n3' : p >= objectius.passos * 0.5 ? 'n2' : 'n1');
+	const m = mitjana(delMes.map((d) => dies[d]?.passos).filter((x) => x != null));
+	const gimnasos = delMes.filter((d) => dies[d]?.gimnas).length;
+	return `<div class="act-mes-cap"><button type="button" class="rodo-petit" data-mes="-1" aria-label="Mes anterior">${icona('enrere', 16)}</button><b>${NOMS_MESOS[primer.getMonth()]}${primer.getFullYear() !== ara.getFullYear() ? ` ${primer.getFullYear()}` : ''}</b><button type="button" class="rodo-petit" data-mes="1" ${estat.mesAct >= 0 ? 'disabled' : ''} aria-label="Mes següent">${icona('endavant', 16)}</button></div>
+		<div class="act-quadrets">${['dl', 'dt', 'dc', 'dj', 'dv', 'ds', 'dg'].map((x) => `<small>${x}</small>`).join('')}${'<span></span>'.repeat((primer.getDay() + 6) % 7)}${delMes
+			.map((d) => `<span class="q ${nivell(dies[d]?.passos)} ${dies[d]?.gimnas ? 'gimnas' : ''} ${d === avui() ? 'avui' : ''} ${d > avui() ? 'futur' : ''}">${Number(d.slice(8))}${partits.has(d) ? '<i></i>' : ''}</span>`)
+			.join('')}</div>
+		<p class="act-peu">${m != null ? `<b>${mil(m)}</b> passos al dia de mitjana` : 'Aquest mes no hi ha passos'} · <b>${gimnasos}</b> ${gimnasos === 1 ? 'dia' : 'dies'} de gimnàs</p>`;
+}
+
+// Avui: el resum de l'Arnau. L'activitat al davant, i després com van les notícies i els diners, i la nota per a Reshi
+function vistaAvui() {
+	const h = new Date().getHours();
+	const salutacio = h < 6 ? 'Bona nit' : h < 14 ? 'Bon dia' : h < 21 ? 'Bona tarda' : 'Bona nit';
+	if (!estat.personal)
+		return `<header class="cap"><span class="sobre">${esc(dataLlarga(avui()))}</span><h1>${salutacio}, Arnau</h1></header>
+	${formCodi('La teva part', 'Posa el codi per veure els teus passos, el gimnàs, el temps de pantalla i els diners. El mòbil el recordarà.')}`;
+	const a = dadesActivitat();
+	const {quan, passos} = passosRecents(a.dies);
+	const pantalla = totalPantalla(a.dies[avui()]?.pantalla ?? a.dies[ahir()]?.pantalla);
+	const frase = [passos != null ? `${quan.toLowerCase()} has fet ${mil(passos)} passos` : '', pantalla != null ? `${temps(pantalla)} de xarxes i jocs` : ''].filter(Boolean).join(' i ');
+	const gimnasos = setmanaDe(new Date()).filter((d) => a.dies[d]?.gimnas).length;
+	const n = noves();
+	const msci = estat.dades.mercat?.actius?.find((x) => x.id === 'msci');
+	return `<header class="cap"><span class="sobre">${esc(dataLlarga(avui()))}</span><h1>${salutacio}, Arnau</h1>${frase ? `<p>${esc(frase[0].toUpperCase() + frase.slice(1))}.</p>` : ''}</header>
+	<section class="activitat">${activitatGran(a)}${barresSetmana(a)}
+		<p class="act-peu"><b>${gimnasos} de ${a.objectius.gimnas}</b> dies de gimnàs aquesta setmana</p>
+		<button type="button" class="act-mes-boto" data-vista="activitat">Tota l’activitat ${icona('endavant', 16)}</button>
+	</section>
+	<div class="resum-fitxes">
+		<button type="button" data-vista="noticies">${icona('noticies', 20)}<b>${n ? `${n} ${n === 1 ? 'nova' : 'noves'}` : 'Al dia'}</b><small>Notícies</small></button>
+		<button type="button" data-vista="mercat">${icona('mercat', 20)}<b>${estat.diners ? eur(estat.diners.total) : msci ? pct(msci.canvis.setmana) : '—'}</b><small>${estat.diners ? 'Els teus diners' : 'El MSCI World, la setmana'}</small></button>
+	</div>
+	${votsPerPassar()}`;
+}
+
+// Activitat sencera: avui, el gimnàs i la ratxa, la setmana de passos i de pantalla, i el mes en quadrets
+function vistaActivitat() {
+	const cap = `<header class="cap"><span class="sobre">Activitat</span><h1>La teva setmana</h1><p>Els passos arriben sols cada nit, el gimnàs amb un toc i el temps de pantalla de les xarxes i els jocs.</p></header>`;
+	if (!estat.personal) return `${cap}${formCodi('La teva activitat', 'Posa el codi per veure-la.')}`;
+	const a = dadesActivitat();
+	const gimnasos = setmanaDe(new Date()).filter((d) => a.dies[d]?.gimnas).length;
+	const ratxa = ratxaGimnas(a.dies, a.objectius.gimnas);
+	return `${cap}
+	<section class="activitat">${activitatGran(a)}</section>
+	<div class="resum-fitxes xifres">
+		<div>${icona('pesa', 18)}<b>${gimnasos}/${a.objectius.gimnas}</b><small>Gimnàs aquesta setmana</small></div>
+		<div>${icona('espurna', 18)}<b>${ratxa}</b><small>${ratxa === 1 ? 'Setmana de ratxa' : 'Setmanes de ratxa'}</small></div>
+	</div>
+	<section class="activitat"><h2 class="etiqueta">${icona('peus', 12)} Passos d’aquesta setmana</h2>${barresSetmana(a, true)}<p class="act-peu">La ratlla és l’objectiu (${mil(a.objectius.passos)}). En daurat, els dies de gimnàs; l’escut, els partits del Real Tiesada.</p></section>
+	<section class="activitat"><h2 class="etiqueta">${icona('mobil', 12)} Temps de pantalla</h2>${pantallaSetmana(a)}<p class="act-llegenda"><span><i class="xarxes"></i>Xarxes</span><span><i class="jocs"></i>Jocs</span></p></section>
+	<section class="activitat"><h2 class="etiqueta">${icona('calendari', 12)} El mes</h2>${mesQuadrets(a)}</section>`;
 }
 
 // el formulari per enviar una nota a Reshi (una idea, un tema que vol seguir, una compra...): només amb el codi posat
@@ -1013,8 +1123,10 @@ function pintar() {
 	}
 	app.innerHTML = `
 	<div class="marca"><img src="icona-192.png" alt=""><b>RESHI</b><button type="button" class="mode" data-mode aria-label="${modeClar() ? 'Passar al mode fosc' : 'Passar al mode clar'}">${icona(modeClar() ? 'lluna' : 'sol', 16)}</button>${estat.personal ? `<span class="obert" title="La part personal està oberta">${icona('obert', 13)}</span>` : ''}</div>
-	<main class="pantalla">${avisDesat()}${estat.vista === 'noticies' ? vistaNoticies() : estat.vista === 'mercat' ? vistaMercat() : vistaVitrina()}</main>
+	<main class="pantalla">${avisDesat()}${{avui: vistaAvui, activitat: vistaActivitat, noticies: vistaNoticies, mercat: vistaMercat, vitrina: vistaVitrina}[estat.vista]()}</main>
 	<nav class="pestanyes" aria-label="Seccions">
+		<button type="button" data-vista="avui" aria-pressed="${estat.vista === 'avui'}">${icona('espurna', 20)}<span>Avui</span></button>
+		<button type="button" data-vista="activitat" aria-pressed="${estat.vista === 'activitat'}">${icona('peus', 20)}<span>Activitat</span></button>
 		<button type="button" data-vista="noticies" aria-pressed="${estat.vista === 'noticies'}">${icona('noticies', 20)}<span>Notícies</span>${estat.dades && noves() ? `<i class="pastilla">${noves()}</i>` : ''}</button>
 		<button type="button" data-vista="mercat" aria-pressed="${estat.vista === 'mercat'}">${icona('mercat', 20)}<span>Mercat</span></button>
 		<button type="button" data-vista="vitrina" aria-pressed="${estat.vista === 'vitrina'}">${icona('vitrina', 20)}<span>Vitrina</span></button>
@@ -1073,6 +1185,9 @@ document.addEventListener('click', (ev) => {
 		estat.lectorIds = idsMercat();
 		if (!estat.lectorIds.includes(b.dataset.noticiaCartera)) estat.lectorIds.unshift(b.dataset.noticiaCartera);
 		obrirLector(Math.max(0, estat.lectorIds.indexOf(b.dataset.noticiaCartera)));
+	} else if (b.dataset.mes) {
+		estat.mesAct = Math.min(0, estat.mesAct + Number(b.dataset.mes));
+		pintar();
 	} else if (b.hasAttribute('data-mode')) {
 		posarMode(modeClar() ? 'fosc' : 'clar');
 		pintar();
