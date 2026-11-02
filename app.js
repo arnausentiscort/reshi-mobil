@@ -1,7 +1,8 @@
 // Reshi al mòbil: les Notícies, el Mercat i la Vitrina. Sense llibreries: dades.json té l'edició pública, el mercat de
 // la setmana (preus, anàlisi, la cartera de prova i les apostes) i la vitrina; privat.json, xifrat, el "per què
-// t'importa" de cada notícia i les notes dels projectes. El codi es posa un cop i el mòbil el recorda. Els vots, de
-// moment, es guarden en aquest mòbil.
+// t'importa" de cada notícia, les notes dels projectes i l'activitat (passos i gimnàs). El codi es posa un cop i el mòbil
+// el recorda. Els passos arriben amb una drecera d'iOS que obre aquesta web amb #passos=8420&dia=2026-11-02 (i el
+// gimnàs, amb #gimnas=1): es desen aquí i van a Reshi per la bústia.
 import {COLOR_RESERVA, COLORS_PARTS, colorVariacio, fetsDe, marquesSobre, perActiu, squarify} from './grafics.js';
 import {ICONES} from './icones.js';
 
@@ -58,6 +59,15 @@ const guardat = {
 	},
 };
 
+// el mode clar o fosc (el botó del sol): es posa a <html data-mode> (index.html ja el posa abans de pintar) i el mòbil el recorda
+const modeClar = () => document.documentElement.dataset.mode === 'clar';
+const posarMode = (m) => {
+	document.documentElement.dataset.mode = m;
+	document.querySelector('meta[name="theme-color"]')?.setAttribute('content', m === 'clar' ? '#f5f3ee' : '#121212');
+	guardat.posar('reshi-mode', m);
+};
+posarMode(guardat.llegir('reshi-mode', 'fosc'));
+
 const estat = {
 	dades: null,
 	vista: 'noticies',
@@ -76,6 +86,9 @@ const estat = {
 	projecte: null, // el projecte de la vitrina obert
 	lectorIds: null, // quan el lector s'obre des del Mercat: les notícies de mercat, en aquest ordre
 	llegidesAbans: new Set(), // les llegides quan es va pintar la llista: l'ordre es fa amb aquestes perquè res salti mentre llegeix
+	activitat: guardat.llegir('reshi-activitat', []), // els passos i el gimnàs que encara no han arribat a Reshi
+	activitatReshi: null, // el que ja té Reshi (del privat.json): dies, objectius i partits
+	desat: null, // l'avís de dalt quan una drecera acaba de desar alguna cosa
 };
 const desarVistes = () => guardat.posar('reshi-vistes', [...estat.vistes]);
 const llegir = (id) => {
@@ -104,6 +117,16 @@ const aplicar = (obert) => {
 	const rebudes = new Set(obert?.rebudes ?? []);
 	estat.notes = estat.notes.filter((n) => !rebudes.has(n.id));
 	guardat.posar('reshi-notes', estat.notes);
+	// i els passos i el gimnàs que Reshi ja té, també
+	estat.activitatReshi = obert?.activitat ?? null;
+	const jaHi = estat.activitatReshi?.dies ?? {};
+	estat.activitat = estat.activitat.filter(
+		(a) =>
+			(a.passos != null && jaHi[a.dia]?.passos !== a.passos) ||
+			(a.gimnas != null && !!jaHi[a.dia]?.gimnas !== a.gimnas) ||
+			(a.pantalla && Object.entries(a.pantalla).some(([k, v]) => (jaHi[a.dia]?.pantalla?.[k] ?? -1) < v)),
+	);
+	guardat.posar('reshi-activitat', estat.activitat);
 	desarVistes();
 	enviarAviat(0);
 	refreshLlegides();
@@ -211,6 +234,7 @@ function vistaNoticies() {
 		}
 	</div>
 	${estat.personal ? '' : formCodi('La part que va per tu', 'Posa el codi i cada notícia et dirà per què t’importa. El mòbil el recordarà.')}
+	${fitxaActivitat()}
 	${
 		agenda.length
 			? `<section class="agenda" aria-label="Pròximament">
@@ -251,7 +275,7 @@ function vistaNoticies() {
 // més d'11 hores que es va enviar.
 const NTFY = 'https://ntfy.sh/';
 const TORNAR = 11 * 3600 * 1000;
-const enviats = guardat.llegir('reshi-enviats', {}); // "v:id:vot", "l:id", "n:id" -> quan es va enviar
+const enviats = guardat.llegir('reshi-enviats', {}); // "v:id:vot", "l:id", "n:id", "a:id" -> quan es va enviar
 const fresc = (k) => Date.now() - (enviats[k] ?? 0) < TORNAR;
 const hex = (b) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, '0')).join('');
 const b64 = (b) => btoa(String.fromCharCode(...new Uint8Array(b)));
@@ -274,12 +298,13 @@ function perEnviar() {
 	for (const [id, v] of Object.entries(estat.vots)) if ((estat.votsReshi[id] ?? 0) !== v && !fresc(`v:${id}:${v}`)) vots[id] = v;
 	const vistes = [...estat.vistes].filter((id) => !estat.vistesReshi.has(id) && !fresc(`l:${id}`)).slice(0, 80);
 	const notes = estat.notes.filter((n) => !fresc(`n:${n.id}`));
-	return {vots, vistes, notes};
+	const activitat = estat.activitat.filter((a) => !fresc(`a:${a.id}`));
+	return {vots, vistes, notes, activitat};
 }
 let enviant = false;
 async function enviar() {
 	const p = perEnviar();
-	if (enviant || (!Object.keys(p.vots).length && !p.vistes.length && !p.notes.length)) return;
+	if (enviant || (!Object.keys(p.vots).length && !p.vistes.length && !p.notes.length && !p.activitat.length)) return;
 	const b = await obrirBustia().catch(() => null);
 	if (!b) return;
 	enviant = true;
@@ -292,9 +317,11 @@ async function enviar() {
 		for (const [id, v] of Object.entries(p.vots)) enviats[`v:${id}:${v}`] = ara;
 		for (const id of p.vistes) enviats[`l:${id}`] = ara;
 		for (const n of p.notes) enviats[`n:${n.id}`] = ara;
+		for (const a of p.activitat) enviats[`a:${a.id}`] = ara;
 		for (const [k, t] of Object.entries(enviats)) if (ara - t > 3 * 86400000) delete enviats[k];
 		guardat.posar('reshi-enviats', enviats);
 		estat.bustia = p.notes.length ? 'Enviat a Reshi.' : '';
+		if (p.activitat.length && estat.desat) estat.desat.enviat = true;
 	} catch {
 		estat.bustia = 'No s’ha pogut enviar: ho tornaré a provar quan tinguis connexió.';
 	} finally {
@@ -302,6 +329,8 @@ async function enviar() {
 	}
 	const caixa = document.getElementById('bustia-estat');
 	if (caixa) caixa.textContent = estat.bustia;
+	const avis = document.getElementById('desat');
+	if (avis) avis.outerHTML = avisDesat();
 }
 let rellotge = null;
 const enviarAviat = (ms = 2000) => {
@@ -310,6 +339,150 @@ const enviarAviat = (ms = 2000) => {
 };
 document.addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && enviar());
 window.addEventListener('online', () => enviarAviat(0));
+
+// --- Activitat: els passos de cada dia i el gimnàs (el mateix que la pàgina Activitat de Reshi, en petit) ---
+const OBJECTIUS = {passos: 10000, gimnas: 2, pantalla: 60};
+const diaDe = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const avui = () => diaDe(new Date());
+const mil = (x) => Math.round(x).toLocaleString('ca-ES');
+// el que escriu la drecera: "8420", "8420.6", "8420,6" o "8.420" (depèn de l'idioma de l'iPhone)
+const llegirPassos = (t) => {
+	const s = String(t ?? '').replace(/\s/g, '');
+	const n = /^\d{1,3}([.,]\d{3})+$/.test(s) ? Number(s.replace(/[.,]/g, '')) : Number(s.replace(',', '.'));
+	return s && Number.isFinite(n) && n >= 0 && n <= 200000 ? Math.round(n) : null;
+};
+// un apunt nou: el del mateix dia que encara no ha arribat es junta amb aquest (el nou mana) i es torna a enviar
+function apuntar(a) {
+	const abans = estat.activitat.find((x) => x.dia === a.dia);
+	estat.activitat = [...estat.activitat.filter((x) => x.dia !== a.dia), {...abans, ...a, id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`}];
+	guardat.posar('reshi-activitat', estat.activitat);
+	enviarAviat(0);
+}
+// el temps de pantalla: el registre que escriuen les automatitzacions de l'iPhone, una línia per cada cop que s'obre o es
+// tanca una app ("xarxes obre 2026-11-02 21:05:33"). Es junta cada obrir amb el tancar que ve després i surten els minuts
+// de cada dia a les xarxes i als jocs. Una sessió de més de 4 hores és que s'ha perdut un tancar: no compta.
+const PANTALLA = ['xarxes', 'jocs'];
+function minutsPantalla(registre) {
+	const fets = String(registre ?? '')
+		.split(/[\r\n]+/)
+		.map((l) => l.trim().split(/\s+/))
+		.filter((x) => x.length >= 4 && PANTALLA.includes(x[0]) && /^(obre|tanca)$/.test(x[1]))
+		.map(([cat, que, d, h]) => ({cat, que, t: new Date(`${d}T${h}`)}))
+		.filter((x) => !Number.isNaN(x.t.getTime()))
+		.sort((a, b) => a.t - b.t);
+	const obert = {};
+	const dies = {};
+	for (const f of fets) {
+		if (f.que === 'obre') {
+			obert[f.cat] ??= f.t;
+		} else if (obert[f.cat]) {
+			const min = (f.t - obert[f.cat]) / 60000;
+			if (min > 0 && min < 240) {
+				const d = diaDe(obert[f.cat]);
+				dies[d] = {xarxes: 0, jocs: 0, ...dies[d]};
+				dies[d][f.cat] += min;
+			}
+			delete obert[f.cat];
+		}
+	}
+	for (const d of Object.values(dies)) for (const k of PANTALLA) d[k] = Math.round(d[k]);
+	return dies;
+}
+const temps = (min) => (min < 60 ? `${min} min` : `${Math.floor(min / 60)} h${min % 60 ? ` ${min % 60} min` : ''}`);
+
+// les dreceres: #passos=8420&dia=2026-11-02 (i &pantalla=<el registre>) o #gimnas=1&dia=2026-11-02. Es desa, s'esborra de
+// l'adreça i es diu
+function delFragment() {
+	const p = new URLSearchParams(location.hash.slice(1));
+	if (!p.has('passos') && !p.has('gimnas') && !p.has('pantalla')) return;
+	history.replaceState(null, '', location.pathname + location.search);
+	const dia = /^20\d\d-\d\d-\d\d$/.test(p.get('dia') ?? '') ? p.get('dia') : avui();
+	const a = {dia};
+	const passos = p.has('passos') ? llegirPassos(p.get('passos')) : null;
+	if (passos != null) a.passos = passos;
+	if (p.has('gimnas')) a.gimnas = p.get('gimnas') !== '0';
+	const pantalla = minutsPantalla(p.get('pantalla'));
+	for (const [d, minuts] of Object.entries(pantalla)) {
+		if (d === dia) a.pantalla = minuts;
+		else apuntar({dia: d, pantalla: minuts});
+	}
+	if (a.passos == null && a.gimnas == null && !a.pantalla && !Object.keys(pantalla).length) return;
+	if (a.passos != null || a.gimnas != null || a.pantalla) apuntar(a);
+	const delDia = pantalla[dia];
+	const que = [
+		a.passos != null ? `${mil(a.passos)} passos` : '',
+		a.gimnas ? 'gimnàs fet' : a.gimnas === false ? 'gimnàs tret' : '',
+		delDia ? `${temps(delDia.xarxes + delDia.jocs)} de pantalla` : '',
+	]
+		.filter(Boolean)
+		.join(' i ');
+	estat.desat = {text: `Desat: ${que || 'temps de pantalla'}${a.dia === avui() ? '' : ` (${dataCurta(a.dia)})`}`, enviat: false};
+}
+window.addEventListener('hashchange', () => {
+	delFragment();
+	pintar();
+});
+const avisDesat = () =>
+	estat.desat
+		? `<p class="desat" id="desat" role="status">${icona('fet', 16)}<span><b>${esc(estat.desat.text)}</b><small>${
+				estat.desat.enviat ? 'Ja és de camí a Reshi.' : guardat.llegir('reshi-codi', null) ? 'L’envio a Reshi…' : 'Posa el codi a sota perquè arribi a Reshi.'
+			}</small></span></p>`
+		: '';
+// els dies (el que té Reshi i, a sobre, el que encara és aquí), els objectius i els partits
+function dadesActivitat() {
+	const r = estat.activitatReshi;
+	const dies = structuredClone(r?.dies ?? {});
+	for (const a of estat.activitat) dies[a.dia] = {...dies[a.dia], ...(a.passos != null && {passos: a.passos}), ...(a.gimnas != null && {gimnas: a.gimnas}), ...(a.pantalla && {pantalla: a.pantalla})};
+	return {dies, objectius: {...OBJECTIUS, ...r?.objectius}, partits: new Set((r?.partits ?? []).map((x) => x.data))};
+}
+// el temps de pantalla de l'últim dia que n'hi ha (avui o ahir): xarxes i jocs, contra el límit
+function pantallaFitxa(dies, limit) {
+	const ara = new Date();
+	const quin = [avui(), diaDe(new Date(ara.getFullYear(), ara.getMonth(), ara.getDate() - 1))].find((d) => dies[d]?.pantalla);
+	if (!quin) return '';
+	const {xarxes = 0, jocs = 0} = dies[quin].pantalla;
+	const total = xarxes + jocs;
+	const max = Math.max(limit, total);
+	return `<div class="act-pantalla ${total > limit ? 'passat' : ''}">
+		<span class="act-pantalla-cap"><small>Pantalla ${quin === avui() ? 'avui' : 'ahir'}</small><b>${temps(total)}</b><small>${total > limit ? `${temps(total - limit)} més del límit` : `límit ${temps(limit)}`}</small></span>
+		<span class="act-pantalla-barra" role="img" aria-label="Xarxes ${temps(xarxes)}, jocs ${temps(jocs)}"><i class="xarxes" style="width:${(xarxes / max) * 100}%"></i><i class="jocs" style="width:${(jocs / max) * 100}%"></i><em style="left:${(limit / max) * 100}%"></em></span>
+		<span class="act-pantalla-llegenda"><span><i class="xarxes"></i>Xarxes ${temps(xarxes)}</span><span><i class="jocs"></i>Jocs ${temps(jocs)}</span></span>
+	</div>`;
+}
+function fitxaActivitat() {
+	if (!estat.personal) return '';
+	const {dies, objectius, partits} = dadesActivitat();
+	const ara = new Date();
+	// la drecera desa els passos a les 23:00: fins llavors, els d'ahir
+	const ahir = diaDe(new Date(ara.getFullYear(), ara.getMonth(), ara.getDate() - 1));
+	const quin = dies[avui()]?.passos != null ? avui() : ahir;
+	const passos = dies[quin]?.passos;
+	const pc = passos != null ? Math.min(1, passos / objectius.passos) : 0;
+	const R = 30;
+	const L = 2 * Math.PI * R;
+	// la setmana de dilluns a diumenge
+	const dl = new Date(ara.getFullYear(), ara.getMonth(), ara.getDate() - ((ara.getDay() + 6) % 7));
+	const setmana = [...Array(7)].map((_, i) => diaDe(new Date(dl.getFullYear(), dl.getMonth(), dl.getDate() + i)));
+	const max = Math.max(objectius.passos, ...setmana.map((d) => dies[d]?.passos ?? 0));
+	const gimnasos = setmana.filter((d) => dies[d]?.gimnas).length;
+	const gimnasAvui = !!dies[avui()]?.gimnas;
+	return `<section class="activitat" aria-label="Activitat">
+		<div class="act-cap">
+			<svg class="act-anell" viewBox="0 0 72 72" role="img" aria-label="${Math.round(pc * 100)} % de l’objectiu"><circle cx="36" cy="36" r="${R}"/><circle class="ple" cx="36" cy="36" r="${R}" stroke-dasharray="${(pc * L).toFixed(1)} ${L.toFixed(1)}"/></svg>
+			<span class="act-xifra"><small>${quin === avui() ? 'Avui' : 'Ahir'}</small><b>${passos != null ? mil(passos) : '—'}</b><small>${passos != null ? `passos · ${Math.round(pc * 100)} % de ${mil(objectius.passos)}` : 'Encara no han arribat'}</small></span>
+			<button type="button" class="act-gimnas" data-gimnas aria-pressed="${gimnasAvui}">${icona('pesa', 18)}<span>${gimnasAvui ? 'Gimnàs fet' : 'Gimnàs avui'}</span></button>
+		</div>
+		<ol class="act-setmana">${setmana
+			.map((d) => {
+				const x = dies[d] ?? {};
+				return `<li class="${x.gimnas ? 'gimnas' : ''} ${d === avui() ? 'avui' : ''} ${x.passos >= objectius.passos ? 'complert' : ''}"><span class="act-barra"><i style="height:${x.passos ? Math.max(4, (x.passos / max) * 100) : 0}%"></i></span>
+				<small>${DIES_CURTS[dia(d).getDay()].slice(0, 2)}</small>${partits.has(d) ? `<em title="Partit del Real Tiesada">${icona('escut', 10)}</em>` : ''}</li>`;
+			})
+			.join('')}</ol>
+		<p class="act-peu"><b>${gimnasos} de ${objectius.gimnas}</b> dies de gimnàs aquesta setmana · en daurat, els dies que hi has anat</p>
+		${pantallaFitxa(dies, objectius.pantalla)}
+	</section>`;
+}
 
 // el formulari per enviar una nota a Reshi (una idea, un tema que vol seguir, una compra...): només amb el codi posat
 function votsPerPassar() {
@@ -839,8 +1012,8 @@ function pintar() {
 		return;
 	}
 	app.innerHTML = `
-	<div class="marca"><img src="icona-192.png" alt=""><b>RESHI</b>${estat.personal ? `<span class="obert" title="La part personal està oberta">${icona('obert', 13)}</span>` : ''}</div>
-	<main class="pantalla">${estat.vista === 'noticies' ? vistaNoticies() : estat.vista === 'mercat' ? vistaMercat() : vistaVitrina()}</main>
+	<div class="marca"><img src="icona-192.png" alt=""><b>RESHI</b><button type="button" class="mode" data-mode aria-label="${modeClar() ? 'Passar al mode fosc' : 'Passar al mode clar'}">${icona(modeClar() ? 'lluna' : 'sol', 16)}</button>${estat.personal ? `<span class="obert" title="La part personal està oberta">${icona('obert', 13)}</span>` : ''}</div>
+	<main class="pantalla">${avisDesat()}${estat.vista === 'noticies' ? vistaNoticies() : estat.vista === 'mercat' ? vistaMercat() : vistaVitrina()}</main>
 	<nav class="pestanyes" aria-label="Seccions">
 		<button type="button" data-vista="noticies" aria-pressed="${estat.vista === 'noticies'}">${icona('noticies', 20)}<span>Notícies</span>${estat.dades && noves() ? `<i class="pastilla">${noves()}</i>` : ''}</button>
 		<button type="button" data-vista="mercat" aria-pressed="${estat.vista === 'mercat'}">${icona('mercat', 20)}<span>Mercat</span></button>
@@ -900,6 +1073,12 @@ document.addEventListener('click', (ev) => {
 		estat.lectorIds = idsMercat();
 		if (!estat.lectorIds.includes(b.dataset.noticiaCartera)) estat.lectorIds.unshift(b.dataset.noticiaCartera);
 		obrirLector(Math.max(0, estat.lectorIds.indexOf(b.dataset.noticiaCartera)));
+	} else if (b.hasAttribute('data-mode')) {
+		posarMode(modeClar() ? 'fosc' : 'clar');
+		pintar();
+	} else if (b.hasAttribute('data-gimnas')) {
+		apuntar({dia: avui(), gimnas: !dadesActivitat().dies[avui()]?.gimnas});
+		pintar();
 	} else if (b.hasAttribute('data-llegir-totes')) {
 		for (const t of estat.dades.edicio.targetes) estat.vistes.add(clau(t));
 		desarVistes();
@@ -987,6 +1166,7 @@ document.addEventListener('keydown', (ev) => {
 });
 
 async function arrencar() {
+	delFragment(); // si l'ha obert una drecera (passos o gimnàs)
 	pintar();
 	try {
 		const [dades, privat] = await Promise.all([fetch('dades.json', {cache: 'no-cache'}).then((r) => r.json()), fetch('privat.json', {cache: 'no-cache'}).then((r) => r.json())]);
