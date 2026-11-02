@@ -106,6 +106,7 @@ const refreshLlegides = () => (estat.llegidesAbans = new Set(estat.vistes));
 // el que surt del privat.json: el "per què t'importa", les notes dels projectes i les llegides a l'ordinador
 const aplicar = (obert) => {
 	estat.personal = obert?.noticies ?? obert;
+	estat.idees = obert?.idees ?? null; // les idees que ja té Reshi
 	estat.projectes = obert?.projectes ?? null; // la nota de cada projecte de la vitrina (què ha fet, què falta)
 	estat.diners = obert?.diners ?? null; // els seus diners de debò
 	estat.despeses = obert?.despeses ?? null; // on se'n van els diners cada mes (despeses.py)
@@ -717,15 +718,29 @@ function compartitResum() {
 }
 
 // el formulari per enviar una nota a Reshi (una idea, un tema que vol seguir, una compra...): només amb el codi posat
-function votsPerPassar() {
+// les idees: el quadre per apuntar-ne una. Es desa al mòbil a l'instant (també sense connexió) i arriba sola a Reshi, que
+// la guarda i la posa a la safata del vault
+function votsPerPassar(ambEnllac = true) {
 	if (!estat.personal) return '';
 	const cua = estat.notes.length;
 	return `<form class="passar" id="form-nota">
-		<p><b>Envia una nota a Reshi.</b> Una idea, un tema que vols que segueixi, el que sigui: hi arriba sol. Els vots i les llegides també hi arriben sols.</p>
-		<textarea name="text" rows="3" maxlength="2000" placeholder="Escriu aquí…" required></textarea>
-		<button type="submit">Enviar a Reshi</button>
-		<p class="bustia-estat" id="bustia-estat" aria-live="polite">${esc(estat.bustia || (cua ? `${cua} ${cua === 1 ? 'nota encara no ha arribat' : 'notes encara no han arribat'} a Reshi.` : ''))}</p>
+		<p><b>${icona('idea', 15)} Apunta una idea.</b> Es queda guardada al mòbil encara que no tinguis connexió, i arriba sola a Reshi i al vault.</p>
+		<textarea name="text" rows="3" maxlength="2000" placeholder="La idea…" required></textarea>
+		<button type="submit">Desar la idea</button>
+		<p class="bustia-estat" id="bustia-estat" aria-live="polite">${esc(estat.bustia || (cua ? `${cua} ${cua === 1 ? 'idea encara és només al mòbil' : 'idees encara són només al mòbil'}: arribaran quan hi hagi connexió.` : ''))}</p>
+		${ambEnllac ? `<button type="button" class="ll-plegat" data-vista="idees">Totes les idees ${icona('endavant', 14)}</button>` : ''}
 	</form>`;
+}
+// totes les idees: les que encara són al mòbil (per enviar) i les que ja té Reshi
+function vistaIdees() {
+	const cap = `<header class="cap"><span class="sobre">Idees</span><h1>Les teves idees</h1><p>Apunta-les aquí: no cal connexió ni el Claude. Arriben soles a Reshi i a la safata del vault.</p></header>`;
+	if (!estat.personal) return `${cap}${formCodi('Les teves idees', 'Posa el codi per apuntar-ne i veure-les.')}`;
+	const ja = new Set((estat.idees ?? []).map((i) => i.id));
+	const totes = [...estat.notes.filter((n) => !ja.has(n.id)).map((n) => ({...n, pendent: true})), ...(estat.idees ?? [])];
+	return `${cap}${votsPerPassar(false)}
+	<ul class="idees-llista">${totes
+		.map((i) => `<li class="${i.pendent ? 'pendent' : ''}"><small>${i.pendent ? `${icona('mobil', 12)} ${enviats[`n:${i.id}`] ? 'Enviada: Reshi la recollirà' : 'Encara al mòbil (sense connexió)'}` : `${icona(i.origen === 'mòbil' ? 'mobil' : 'tauler', 12)} ${esc(i.quan)}`}</small><p>${esc(i.text)}</p></li>`)
+		.join('') || '<p class="buit">Encara no n’has apuntat cap.</p>'}</ul>`;
 }
 
 // --- Mercat: com està la setmana, per què, la cartera de prova de Reshi i què pot passar (el mateix que a Reshi) ---
@@ -1280,7 +1295,7 @@ function pintar() {
 	}
 	app.innerHTML = `
 	<div class="marca"><img src="icona-192.png" alt=""><b>RESHI</b><button type="button" class="mode" data-mode aria-label="${modeClar() ? 'Passar al mode fosc' : 'Passar al mode clar'}">${icona(modeClar() ? 'lluna' : 'sol', 16)}</button>${estat.personal ? `<span class="obert" title="La part personal està oberta">${icona('obert', 13)}</span>` : ''}</div>
-	<main class="pantalla">${avisDesat()}${{avui: vistaAvui, activitat: vistaActivitat, llista: vistaLlista, despeses: vistaDespeses, noticies: vistaNoticies, mercat: vistaMercat, vitrina: vistaVitrina}[estat.vista]()}</main>
+	<main class="pantalla">${avisDesat()}${{avui: vistaAvui, activitat: vistaActivitat, llista: vistaLlista, despeses: vistaDespeses, idees: vistaIdees, noticies: vistaNoticies, mercat: vistaMercat, vitrina: vistaVitrina}[estat.vista]()}</main>
 	<nav class="pestanyes" aria-label="Seccions">
 		<button type="button" data-vista="avui" aria-pressed="${estat.vista === 'avui'}">${icona('espurna', 20)}<span>Avui</span></button>
 		<button type="button" data-vista="activitat" aria-pressed="${estat.vista === 'activitat'}">${icona('peus', 20)}<span>Activitat</span></button>
@@ -1409,7 +1424,8 @@ document.addEventListener('submit', (ev) => {
 	estat.notes.push({id: `${ara.getTime().toString(36)}-${Math.random().toString(36).slice(2, 6)}`, text, quan: ara.toISOString().slice(0, 16).replace('T', ' ')});
 	guardat.posar('reshi-notes', estat.notes);
 	ev.target.reset();
-	estat.bustia = 'Enviant…';
+	estat.bustia = navigator.onLine ? 'Enviant…' : 'Desada al mòbil: arribarà quan hi hagi connexió.';
+	if (estat.vista === 'idees') pintar();
 	document.getElementById('bustia-estat').textContent = estat.bustia;
 	enviar();
 });

@@ -845,3 +845,11 @@ a.trofeu-obrir { text-decoration: none; }
 .resum-fitxes .gran { grid-column: 1 / -1; }
 
 .ds-cats li b { white-space: nowrap; }
+
+/* les idees */
+.passar p b { display: inline-flex; align-items: center; gap: 5px; }
+.idees-llista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.idees-llista li { display: flex; flex-direction: column; gap: 4px; padding: 12px 2px; border-top: 1px solid var(--vora); }
+.idees-llista small { display: inline-flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 11px; font-weight: 800; color: var(--text-3); }
+.idees-llista li.pendent small { color: var(--or); }
+.idees-llista p { margin: 0; font-size: 15px; line-height: 1.55; white-space: pre-wrap; }
