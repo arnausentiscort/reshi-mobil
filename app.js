@@ -94,8 +94,6 @@ const estat = {
 	filtreLlista: 'tot', // tot, meu, regals o l'id d'un projecte
 	carta: false, // la carta de regals oberta
 	mesDespeses: null, // el mes que es mira a les despeses (per defecte, l'últim sencer)
-	catDespeses: null, // a les despeses: només els moviments d'aquesta categoria
-	compteDespeses: 'meus', // a les despeses: els meus comptes o el compte compartit
 };
 const desarVistes = () => guardat.posar('reshi-vistes', [...estat.vistes]);
 const llegir = (id) => {
@@ -694,37 +692,27 @@ function vistaDespeses() {
 	if (!estat.personal) return `${cap}${formCodi('Els teus diners', 'Posa el codi per veure’ls.')}`;
 	const bloc = despesesMeves();
 	if (!bloc) return `${cap}<p class="buit">Encara no hi ha extractes importats.</p>`;
-	return `${cap}${bloc}${moviments()}`;
+	return `${cap}${bloc}${compartitResum()}`;
 }
-// cada moviment del mes: el que has pagat amb la targeta, els bizums, la nòmina... per dies. Tocant una categoria de dalt,
-// només els d'aquella categoria; els traspassos entre els teus comptes surten apagats (no compten)
-function moviments() {
-	const tots = estat.despeses.moviments;
-	if (!tots?.length) return '';
+// el compte compartit amb la Núria, per sobre: què s'hi ha gastat el mes, qui hi ha posat què i en què se n'ha anat
+function compartitResum() {
+	const c = estat.despeses?.compartit;
 	const mes = mesDespeses();
-	const compartit = estat.compteDespeses === 'compartit';
-	const cat = estat.catDespeses;
-	const llista = tots.filter((m) => m.data.startsWith(mes) && m.compartit === compartit && (!cat || m.categoria === cat));
-	const dies = new Map();
-	for (const m of llista) dies.set(m.data, [...(dies.get(m.data) ?? []), m]);
+	const x = c?.[mes];
+	if (!x) return '';
+	const cats = Object.entries(x.categories).sort((p, q) => q[1] - p[1]);
+	const max = Math.max(...cats.map(([, v]) => Math.abs(v)), 1);
+	const posat = Object.values(x.aportacions ?? {}).reduce((t, v) => t + v, 0);
 	return `<section class="m-bloc">
-		<h2 class="m-titol">Moviments <small>${cat ? `${esc(cat)} · ` : ''}${llista.length}</small></h2>
-		<nav class="filtres" aria-label="Compte">
-			<button type="button" data-compte-despeses="meus" aria-pressed="${!compartit}">Els meus comptes</button>
-			<button type="button" data-compte-despeses="compartit" aria-pressed="${compartit}">Compte compartit</button>
-			${cat ? `<button type="button" data-cat-despeses="" aria-pressed="true">${esc(cat)} ✕</button>` : ''}
-		</nav>
-		${[...dies.entries()]
-			.map(
-				([d, ms]) => `<h3 class="mv-dia">${esc(dataCurta(d))}</h3><ul class="mv-llista">${ms
-					.map(
-						(m) => `<li class="${m.categoria === 'Traspàs' ? 'fora' : ''}"><span class="mv-icona">${icona(m.targeta ? 'cartera' : m.import > 0 ? 'amunt' : 'fletxa', 16)}</span>
-					<span class="mv-text"><b>${esc(m.concepte)}</b><small>${esc(m.categoria)} · ${esc(m.compte)}</small></span>
-					<b class="mv-import ${m.import > 0 ? 'puja' : ''}">${m.import > 0 ? '+' : '−'}${Math.abs(m.import).toLocaleString('ca-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2})} €</b></li>`,
-					)
-					.join('')}</ul>`,
-			)
-			.join('') || '<p class="buit">Cap moviment.</p>'}
+		<h2 class="m-titol">Compte compartit <small>amb la Núria · ${NOMS_MESOS[Number(mes.slice(5, 7)) - 1].toLowerCase()}</small></h2>
+		<div class="m-cartera-xifres">
+			<div><span>S’hi ha gastat</span><b>${eur(x.despesa)}</b><small>la teva meitat, ${eur(x.despesa / 2)}</small></div>
+			${Object.entries(x.aportacions ?? {})
+				.map(([qui, v]) => `<div><span>Hi ha posat ${esc(qui === 'Arnau' ? 'tu' : qui === 'Nuria' ? 'la Núria' : qui)}</span><b class="puja">${eur(v)}</b></div>`)
+				.join('')}
+			${posat ? `<div><span>Queda del mes</span><b class="${posat - x.despesa >= 0 ? 'puja' : 'baixa'}">${eur(posat - x.despesa)}</b><small>el que heu posat menys el gastat</small></div>` : ''}
+		</div>
+		<ul class="ds-cats">${cats.map(([k, v]) => `<li><span>${esc(k)}</span><span class="ds-barra"><i style="width:${(Math.abs(v) / max) * 100}%"></i></span><b>${eur(v)}</b></li>`).join('')}</ul>
 	</section>`;
 }
 
@@ -907,7 +895,7 @@ function despesesMeves() {
 			<div><span>Has estalviat</span><b class="${x.ingressos - x.despesa >= 0 ? 'puja' : 'baixa'}">${eur(x.ingressos - x.despesa)}</b><small>${mes === avui().slice(0, 7) ? 'el mes encara no s’ha acabat' : x.incomplet ? 'falta algun extracte d’aquest mes' : ''}</small></div>
 		</div>
 		<ul class="ds-cats">${cats
-			.map(([c, v]) => `<li><button type="button" data-cat-despeses="${esc(c)}" aria-pressed="${estat.catDespeses === c}"><span>${esc(c)}</span><span class="ds-barra"><i style="width:${(Math.abs(v) / max) * 100}%;${v < 0 ? 'opacity:.4' : ''}"></i></span><b>${v < 0 ? '+' : ''}${eur(Math.abs(v))}</b></button></li>`)
+			.map(([c, v]) => `<li><span>${esc(c)}</span><span class="ds-barra"><i style="width:${(Math.abs(v) / max) * 100}%;${v < 0 ? 'opacity:.4' : ''}"></i></span><b>${v < 0 ? '+' : ''}${eur(Math.abs(v))}</b></li>`)
 			.join('')}</ul>
 		${comp ? `<p class="m-peu">Al compte compartit amb la Núria s’hi ha gastat ${eur(comp.despesa)} aquest mes.</p>` : ''}
 	</section>`;
@@ -1364,17 +1352,7 @@ document.addEventListener('click', (ev) => {
 	} else if (b.hasAttribute('data-tancar-carta')) {
 		estat.carta = false;
 		pintar();
-	} else if (b.dataset.catDespeses !== undefined) {
-		estat.catDespeses = b.dataset.catDespeses || null;
-		if (estat.vista !== 'despeses') estat.vista = 'despeses';
-		pintar();
-		document.querySelector('.mv-dia')?.scrollIntoView({behavior: 'smooth', block: 'start'});
-	} else if (b.dataset.compteDespeses) {
-		estat.compteDespeses = b.dataset.compteDespeses;
-		estat.catDespeses = null;
-		pintar();
 	} else if (b.dataset.mesDespeses) {
-		estat.catDespeses = null;
 		estat.mesDespeses = b.dataset.mesDespeses;
 		pintar();
 	} else if (b.dataset.mes) {
