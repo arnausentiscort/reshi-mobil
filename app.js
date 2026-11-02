@@ -95,6 +95,7 @@ const estat = {
 	filtreLlista: 'tot', // tot, meu, regals o l'id d'un projecte
 	editantCosa: null,
 	carta: false, // la carta de regals oberta
+	mesDespeses: null, // el mes que es mira a les despeses (per defecte, l'últim sencer)
 };
 const desarVistes = () => guardat.posar('reshi-vistes', [...estat.vistes]);
 const llegir = (id) => {
@@ -109,6 +110,7 @@ const aplicar = (obert) => {
 	estat.personal = obert?.noticies ?? obert;
 	estat.projectes = obert?.projectes ?? null; // la nota de cada projecte de la vitrina (què ha fet, què falta)
 	estat.diners = obert?.diners ?? null; // els seus diners de debò
+	estat.despeses = obert?.despeses ?? null; // on se'n van els diners cada mes (despeses.py)
 	for (const id of obert?.vistes ?? []) estat.vistes.add(id); // les que ja va llegir a l'ordinador
 	// els vots que ja té Reshi: es marquen aquí també (i una votada és una llegida)
 	estat.votsReshi = obert?.vots ?? {};
@@ -849,6 +851,35 @@ function dinersMeus() {
 		</div>
 	</section>`;
 }
+// on se'n van els diners: el mes triat, què ha entrat, què s'ha gastat per categories i l'estalvi (el mateix que la
+// pàgina Despeses de Reshi). Els traspassos entre els seus comptes no compten; el compte compartit va a part.
+function despesesMeves() {
+	const d = estat.despeses;
+	if (!d?.meus) return '';
+	const mesos = Object.keys(d.meus).sort().reverse();
+	const sencers = mesos.filter((m) => !d.meus[m].incomplet && m < avui().slice(0, 7));
+	const mes = estat.mesDespeses && d.meus[estat.mesDespeses] ? estat.mesDespeses : sencers[0] ?? mesos[0];
+	const x = d.meus[mes];
+	const cats = Object.entries(x.categories).sort((a, b) => b[1] - a[1]);
+	const max = Math.max(...cats.map(([, v]) => Math.abs(v)), 1);
+	const abans = sencers.filter((m) => m < mes);
+	const mitjana = abans.length ? abans.reduce((t, m) => t + d.meus[m].despesa, 0) / abans.length : null;
+	const comp = d.compartit?.[mes];
+	const nomMes = (m) => NOMS_MESOS[Number(m.slice(5, 7)) - 1];
+	return `<section class="m-bloc">
+		<h2 class="m-titol">On van els teus diners <small>dels extractes de Trade Republic i CaixaBank</small></h2>
+		<nav class="filtres" aria-label="Mes">${mesos.map((m) => `<button type="button" data-mes-despeses="${m}" aria-pressed="${m === mes}">${nomMes(m)}${d.meus[m].incomplet ? ' *' : ''}</button>`).join('')}</nav>
+		<div class="m-cartera-xifres">
+			<div><span>Ha entrat</span><b class="puja">${eur(x.ingressos)}</b><small>nòmina, interessos i el que t’envien</small></div>
+			<div><span>T’has gastat</span><b>${eur(x.despesa)}</b><small>${mitjana != null ? `${x.despesa > mitjana ? 'més' : 'menys'} que la mitjana (${eur(mitjana)})` : 'sense traspassos entre comptes'}</small></div>
+			<div><span>Has estalviat</span><b class="${x.ingressos - x.despesa >= 0 ? 'puja' : 'baixa'}">${eur(x.ingressos - x.despesa)}</b><small>${mes === avui().slice(0, 7) ? 'el mes encara no s’ha acabat' : x.incomplet ? 'falta algun extracte d’aquest mes' : ''}</small></div>
+		</div>
+		<ul class="ds-cats">${cats
+			.map(([c, v]) => `<li><span>${esc(c)}</span><span class="ds-barra"><i style="width:${(Math.abs(v) / max) * 100}%;${v < 0 ? 'opacity:.4' : ''}"></i></span><b>${v < 0 ? '+' : ''}${eur(Math.abs(v))}</b></li>`)
+			.join('')}</ul>
+		${comp ? `<p class="m-peu">Al compte compartit amb la Núria s’hi ha gastat ${eur(comp.despesa)} aquest mes.</p>` : ''}
+	</section>`;
+}
 const signeDiners = (x) => `${x >= 0 ? '+' : '−'}${eur(Math.abs(x))}`;
 
 // el Mercat, més net: una fila amb què li toca a cada cosa que té o mira (en triar-ne una, només queden les notícies
@@ -1069,7 +1100,7 @@ function vistaMercat() {
 		<span class="sobre">Mercat${s?.data ? ` · setmana del ${dataBarra(s.data)}` : ''}</span>
 		<h1>Com està el mercat</h1>
 	</header>
-	${comEsta}${dinersMeus()}${perQue}${laLlibreta()}${dinsMsci(estat.dades.msci, m.actius.find((x) => x.id === 'msci')?.canvis.setmana)}${cartera}${apostes}${futur}
+	${comEsta}${dinersMeus()}${despesesMeves()}${perQue}${laLlibreta()}${dinsMsci(estat.dades.msci, m.actius.find((x) => x.id === 'msci')?.canvis.setmana)}${cartera}${apostes}${futur}
 	<p class="m-peu">L’anàlisi es renova cada diumenge. Reshi analitza i explica: no és un assessor financer.</p>`;
 }
 
@@ -1311,6 +1342,9 @@ document.addEventListener('click', (ev) => {
 		pintar();
 	} else if (b.hasAttribute('data-tancar-carta')) {
 		estat.carta = false;
+		pintar();
+	} else if (b.dataset.mesDespeses) {
+		estat.mesDespeses = b.dataset.mesDespeses;
 		pintar();
 	} else if (b.dataset.mes) {
 		estat.mesAct = Math.min(0, estat.mesAct + Number(b.dataset.mes));

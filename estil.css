@@ -819,3 +819,11 @@ a.trofeu-obrir { text-decoration: none; }
 .ll-carta-paper li span { font-family: var(--mono); font-weight: 800; color: #8a6420; }
 .ll-carta-paper li small { grid-column: 1 / -1; font-size: 11.5px; color: #9c8a6c; }
 .resum-fitxes { grid-template-columns: 1fr 1fr; }
+
+/* on van els diners: una barra per categoria */
+.ds-cats { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.ds-cats li { display: grid; grid-template-columns: 1fr 90px auto; align-items: center; gap: 10px; font-size: 13.5px; }
+.ds-cats .ds-barra { height: 7px; border-radius: 4px; background: rgba(var(--t), 0.06); overflow: hidden; }
+.ds-cats .ds-barra i { display: block; height: 100%; border-radius: 4px; background: var(--or); }
+.ds-cats b { font-family: var(--mono); font-weight: 800; color: var(--fort); text-align: right; }
+.m-bloc .filtres { margin-top: 10px; margin-bottom: 10px; }
