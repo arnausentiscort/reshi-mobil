@@ -373,9 +373,10 @@ const PANTALLA = ['xarxes', 'jocs'];
 function minutsPantalla(registre) {
 	const fets = String(registre ?? '')
 		.split(/[\r\n]+/)
-		.map((l) => l.trim().split(/\s+/))
-		.filter((x) => x.length >= 4 && PANTALLA.includes(x[0]) && /^(obre|tanca)$/.test(x[1]))
-		.map(([cat, que, d, h]) => ({cat, que, t: new Date(`${d}T${h}`)}))
+		// la data, com "2026-11-02 21:05:33" o en ISO 8601 ("2026-11-02T21:05:33+01:00"): es pren l'hora tal com és
+		.map((l) => l.trim().match(/^(xarxes|jocs)\s+(obre|tanca)\s+(\d{4}-\d\d-\d\d)[T\s](\d\d:\d\d(?::\d\d)?)/))
+		.filter(Boolean)
+		.map(([, cat, que, d, h]) => ({cat, que, t: new Date(`${d}T${h}`)}))
 		.filter((x) => !Number.isNaN(x.t.getTime()))
 		.sort((a, b) => a.t - b.t);
 	const obert = {};
@@ -602,7 +603,9 @@ function vistaActivitat() {
 	const a = dadesActivitat();
 	const gimnasos = setmanaDe(new Date()).filter((d) => a.dies[d]?.gimnas).length;
 	const ratxa = ratxaGimnas(a.dies, a.objectius.gimnas);
+	const connectat = arribat(a.dies, 'passos');
 	return `${cap}
+	${connectat ? '' : `<button type="button" class="ip-entrada" data-vista="iphone">${icona('mobil', 20)}<span><b>Connecta l’iPhone</b><small>Encara no ha arribat cap dia de passos. Aquí tens com fer-ho, pas a pas.</small></span>${icona('endavant', 16)}</button>`}
 	<section class="activitat">${activitatGran(a)}</section>
 	<div class="resum-fitxes xifres">
 		<div>${icona('pesa', 18)}<b>${gimnasos}/${a.objectius.gimnas}</b><small>Gimnàs aquesta setmana</small></div>
@@ -610,7 +613,100 @@ function vistaActivitat() {
 	</div>
 	<section class="activitat"><h2 class="etiqueta">${icona('peus', 12)} Passos d’aquesta setmana</h2>${barresSetmana(a, true)}<p class="act-peu">La ratlla és l’objectiu (${mil(a.objectius.passos)}). En daurat, els dies de gimnàs; l’escut, els partits del Real Tiesada.</p></section>
 	<section class="activitat"><h2 class="etiqueta">${icona('mobil', 12)} Temps de pantalla</h2>${pantallaSetmana(a)}<p class="act-llegenda"><span><i class="xarxes"></i>Xarxes</span><span><i class="jocs"></i>Jocs</span></p></section>
-	<section class="activitat"><h2 class="etiqueta">${icona('calendari', 12)} El mes</h2>${mesQuadrets(a)}</section>`;
+	<section class="activitat"><h2 class="etiqueta">${icona('calendari', 12)} El mes</h2>${mesQuadrets(a)}</section>
+	${connectat ? `<button type="button" class="act-mes-boto" data-vista="iphone">${icona('mobil', 16)} Les dreceres de l’iPhone</button>` : ''}`;
+}
+
+// --- Connectar l'iPhone: la guia de les dreceres, per fer-la des del mateix mòbil. Cada pas diu si ja n'arriba res, i el
+// que s'ha d'escriure es copia amb un toc. Les dreceres no porten la data: la web hi posa la d'avui.
+const WEB = 'https://arnausentiscort.github.io/reshi-mobil/';
+// l'últim dia que ha arribat una cosa (passos, gimnàs o pantalla), o null
+const arribat = (dies, que) =>
+	Object.keys(dies)
+		.filter((d) => (que === 'passos' ? dies[d].passos != null : que === 'gimnas' ? dies[d].gimnas : dies[d].pantalla))
+		.sort()
+		.pop() ?? null;
+const copiar = (text) => `<button type="button" class="ip-copiar" data-copiar="${esc(text)}"><code>${esc(text.trim())}</code><span>${icona('copiar', 14)} Copiar</span></button>`;
+const accio = (nom, cerca) => `<b class="ip-accio">${esc(nom)}</b>${cerca ? ` <small class="ip-cerca">(busca «${esc(cerca)}»)</small>` : ''}`;
+function pasIphone(n, titol, quan, fet, cos) {
+	return `<details class="ip-pas ${fet ? 'fet' : ''}" ${fet ? '' : 'open'}>
+		<summary><span class="ip-num">${fet ? icona('fet', 14) : n}</span><span><b>${titol}</b><small>${fet === true ? 'Fet' : fet ? `Funciona: l’últim, ${dataCurta(fet).toLowerCase()}` : quan}</small></span></summary>
+		<div class="ip-cos">${cos}</div>
+	</details>`;
+}
+function vistaIphone() {
+	const cap = `<header class="cap"><span class="sobre">Activitat</span><h1>Connecta l’iPhone</h1><p>Tres dreceres i els passos, el gimnàs i el temps de pantalla arriben sols. Es fan un sol cop, a l’app Dreceres, en aquest ordre. Cada pas es marca sol quan funciona.</p></header>`;
+	if (!estat.personal) return `${cap}${formCodi('Connecta l’iPhone', 'Posa el codi per començar.')}`;
+	const {dies} = dadesActivitat();
+	const app = navigator.standalone || matchMedia('(display-mode: standalone)').matches;
+	return `${cap}
+	${pasIphone(
+		0,
+		'El codi, també al Safari',
+		'Un minut',
+		!app,
+		app
+			? `<p>Les dreceres obren Reshi al <b>Safari</b>, i el Safari no veu el codi que has posat a la icona. Copia l’enllaç, obre’l al Safari, posa-hi el codi i ja el recordarà.</p>${copiar(WEB)}`
+			: `<p>Ja ets al Safari i amb el codi posat: aquest pas ja està.</p>`,
+	)}
+	${pasIphone(
+		1,
+		'Gimnàs, amb un toc',
+		'Dos minuts. Una drecera de dues accions.',
+		arribat(dies, 'gimnas'),
+		`<ol>
+			<li>Obre l’app <b>Dreceres</b> i toca el <b>+</b> de dalt a la dreta.</li>
+			<li>Afegeix l’acció ${accio('Text')} i enganxa-hi això:${copiar(`${WEB}#gimnas=1`)}</li>
+			<li>A sota, l’acció ${accio('Obrir URLs', 'obrir URL')}.</li>
+			<li>A dalt de tot, posa-li de nom <b>Gimnàs</b> i toca <b>Fet</b>.</li>
+		</ol>
+		<p class="ip-prova">${icona('fet', 14)} <b>Prova-la:</b> toca-la. S’obrirà Reshi i dirà «Desat: gimnàs fet». Si no hi has anat, el botó del gimnàs de l’activitat el treu.</p>
+		<p class="ip-extra">Per tenir-la a mà: <b>Configuració → Accessibilitat → Tocar → Tocar el darrere → Doble toc → Gimnàs</b>. Dos copets a l’esquena del mòbil i fet.</p>`,
+	)}
+	${pasIphone(
+		2,
+		'Passos, cada nit sols',
+		'Cinc minuts. Una drecera i una automatització.',
+		arribat(dies, 'passos'),
+		`<p><b>La drecera.</b> A Dreceres, <b>+</b>, i posa-li de nom <b>Passos Reshi</b>. Les accions, en ordre:</p>
+		<ol>
+			<li>${accio('Buscar mostres de salut', 'salut')}: toca <i>Tipus</i> i tria <b>Passos</b>. La data ja diu «avui»: deixa-la.</li>
+			<li>${accio('Calcular estadístiques', 'estadístiques')}: on diu <i>Mitjana</i>, tria <b>Suma</b>.</li>
+			<li>${accio('Text')}: enganxa-hi això ${copiar(`${WEB}#passos=`)} i, just darrere, toca <b>Estadístiques</b> a la barra de sobre el teclat (és el número de passos).</li>
+			<li>${accio('Obrir URLs', 'obrir URL')}.</li>
+		</ol>
+		<p class="ip-prova">${icona('fet', 14)} <b>Prova-la</b> amb el ▶ de baix. El primer cop demana permís per llegir Salut: <b>Permetre</b>. Ha de dir «Desat: … passos», els d’avui.</p>
+		<p><b>Que vagi sola.</b> Pestanya <b>Automatització</b> → <b>+</b> → <b>Hora del dia</b>: <b>23:00</b>, <b>Cada dia</b> → <b>Executar immediatament</b> → tria <b>Passos Reshi</b>.</p>
+		<p class="ip-extra">Si alguna nit no arriba, és que el mòbil estava bloquejat (llavors l’iPhone no deixa llegir Salut). Canvia l’automatització a <b>Executar després de confirmar</b>: a les 23:00 et sortirà un avís i amb un toc s’envia.</p>`,
+	)}
+	${pasIphone(
+		3,
+		'Temps de pantalla (xarxes i jocs)',
+		'Deu minuts. Quatre automatitzacions iguals i tres accions més a Passos Reshi.',
+		arribat(dies, 'pantalla'),
+		`<p>Apple no deixa llegir el Temps d’ús. Per això l’iPhone apuntarà ell mateix, en un fitxer, quan obres i tanques les apps que no aporten, i cada nit Passos Reshi l’envia amb els passos.</p>
+		<p><b>Les quatre automatitzacions.</b> Pestanya <b>Automatització</b> → <b>+</b> → <b>App</b>. Fes-ne una per fila:</p>
+		<table class="ip-taula"><thead><tr><th>Apps</th><th>Marca</th><th>El text</th></tr></thead><tbody>
+			<tr><td>Instagram, TikTok, YouTube</td><td><b>S’obre</b></td><td>${copiar('xarxes obre ')}</td></tr>
+			<tr><td>Instagram, TikTok, YouTube</td><td><b>Es tanca</b></td><td>${copiar('xarxes tanca ')}</td></tr>
+			<tr><td>Els teus jocs</td><td><b>S’obre</b></td><td>${copiar('jocs obre ')}</td></tr>
+			<tr><td>Els teus jocs</td><td><b>Es tanca</b></td><td>${copiar('jocs tanca ')}</td></tr>
+		</tbody></table>
+		<p>A cadascuna: <b>Executar immediatament</b> (i treu «Notificar») → <b>Nova drecera buida</b> → una sola acció, ${accio('Afegir al fitxer de text', 'afegir')}:</p>
+		<ol>
+			<li>On diu <i>Text</i>: enganxa el text de la fila i, darrere, la variable <b>Data actual</b>. Toca la variable → <i>Format de la data</i>: <b>ISO 8601</b>, i activa <b>Incloure l’hora</b>.</li>
+			<li>On diu <i>Fitxer</i>: ${copiar('reshi-pantalla.txt')} (a la carpeta Dreceres, la que surt). Que estigui activat <b>Fer una línia nova</b>.</li>
+		</ol>
+		<p><b>A la drecera Passos Reshi.</b> Dues accions a dalt de tot (afegeix-les i arrossega-les amunt):</p>
+		<ol>
+			<li>${accio('Obtenir fitxer', 'obtenir fitxer')}: carpeta <b>Dreceres</b>, camí ${copiar('reshi-pantalla.txt')} i treu <b>Error si no es troba</b>.</li>
+			<li>${accio('Codificar URL', 'codificar')}, del fitxer d’abans.</li>
+		</ol>
+		<p>Al <b>Text</b> de l’enllaç, al final de tot, enganxa ${copiar('&pantalla=')} i darrere la variable <b>Text codificat</b>.</p>
+		<p>I al final de la drecera, perquè l’endemà comenci net: ${accio('Text')} amb només un espai i ${accio('Desar fitxer', 'desar')} a la carpeta Dreceres, camí <code>reshi-pantalla.txt</code>, amb <b>Substituir</b> activat i <b>Preguntar on desar</b> apagat.</p>
+		<p class="ip-prova">${icona('fet', 14)} <b>Prova-ho:</b> obre Instagram un minut, tanca’l i toca el ▶ de Passos Reshi. Ha de dir «Desat: … passos i 1 min de pantalla».</p>`,
+	)}
+	<button type="button" class="act-mes-boto" data-vista="activitat">${icona('enrere', 16)} Tornar a l’activitat</button>`;
 }
 
 // --- La llista de coses: el que ha de comprar, per mirar-ho (la mateixa que a Reshi). Es fa sola amb la llista de compra de
@@ -1295,7 +1391,7 @@ function pintar() {
 	}
 	app.innerHTML = `
 	<div class="marca"><img src="icona-192.png" alt=""><b>RESHI</b><button type="button" class="mode" data-mode aria-label="${modeClar() ? 'Passar al mode fosc' : 'Passar al mode clar'}">${icona(modeClar() ? 'lluna' : 'sol', 16)}</button>${estat.personal ? `<span class="obert" title="La part personal està oberta">${icona('obert', 13)}</span>` : ''}</div>
-	<main class="pantalla">${avisDesat()}${{avui: vistaAvui, activitat: vistaActivitat, llista: vistaLlista, despeses: vistaDespeses, idees: vistaIdees, noticies: vistaNoticies, mercat: vistaMercat, vitrina: vistaVitrina}[estat.vista]()}</main>
+	<main class="pantalla">${avisDesat()}${{avui: vistaAvui, activitat: vistaActivitat, llista: vistaLlista, despeses: vistaDespeses, idees: vistaIdees, noticies: vistaNoticies, mercat: vistaMercat, vitrina: vistaVitrina, iphone: vistaIphone}[estat.vista]()}</main>
 	<nav class="pestanyes" aria-label="Seccions">
 		<button type="button" data-vista="avui" aria-pressed="${estat.vista === 'avui'}">${icona('espurna', 20)}<span>Avui</span></button>
 		<button type="button" data-vista="activitat" aria-pressed="${estat.vista === 'activitat'}">${icona('peus', 20)}<span>Activitat</span></button>
@@ -1349,6 +1445,15 @@ document.addEventListener('click', (ev) => {
 		refreshLlegides();
 		pintar();
 		window.scrollTo(0, 0);
+	} else if (b.dataset.copiar !== undefined) {
+		// el que s'ha d'escriure a les dreceres, al porta-retalls (i si no es pot, seleccionat per copiar-lo a mà)
+		const aMa = () => getSelection().selectAllChildren(b.querySelector('code'));
+		const fet = () => {
+			b.classList.add('copiat');
+			b.querySelector('span').innerHTML = `${icona('fet', 14)} Copiat`;
+		};
+		if (navigator.clipboard) navigator.clipboard.writeText(b.dataset.copiar).then(fet, aMa);
+		else aMa();
 	} else if (b.dataset.noticiaMercat) {
 		// des del Mercat: el lector passa les notícies de mercat, començant per la clicada
 		estat.lectorIds = idsMercat();
