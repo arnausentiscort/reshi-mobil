@@ -353,6 +353,9 @@ const OBJECTIUS = {passos: 10000, gimnas: 2, pantalla: 60};
 // De moment, el gimnàs i el temps de pantalla van amagats: sense rellotge, l'Arnau no els vol apuntar des del mòbil. Les
 // dreceres i les dades hi són igual; per tornar-los a ensenyar, posa-ho a true.
 const AMB_GIMNAS = false;
+// i, de moment, tota l'Activitat amagada (la pestanya i el bloc de l'Avui). Els passos que envien les dreceres es continuen
+// desant; per tornar-la a ensenyar, posa-ho a true.
+const AMB_ACTIVITAT = false;
 const AMB_PANTALLA = false;
 const diaDe = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const avui = () => diaDe(new Date());
@@ -577,19 +580,19 @@ function vistaAvui() {
 	const salutacio = h < 6 ? 'Bona nit' : h < 14 ? 'Bon dia' : h < 21 ? 'Bona tarda' : 'Bona nit';
 	if (!estat.personal)
 		return `<header class="cap"><span class="sobre">${esc(dataLlarga(avui()))}</span><h1>${salutacio}, Arnau</h1></header>
-	${formCodi('La teva part', 'Posa el codi per veure els teus passos i els diners. El mòbil el recordarà.')}`;
+	${formCodi('La teva part', `Posa el codi per veure ${AMB_ACTIVITAT ? 'els teus passos i ' : ''}els diners. El mòbil el recordarà.`)}`;
 	const a = dadesActivitat();
 	const {quan, passos} = passosRecents(a.dies);
 	const pantalla = totalPantalla(a.dies[avui()]?.pantalla ?? a.dies[ahir()]?.pantalla);
-	const frase = [passos != null ? `${quan.toLowerCase()} has fet ${mil(passos)} passos` : '', AMB_PANTALLA && pantalla != null ? `${temps(pantalla)} de xarxes i jocs` : ''].filter(Boolean).join(' i ');
+	const frase = [AMB_ACTIVITAT && passos != null ? `${quan.toLowerCase()} has fet ${mil(passos)} passos` : '', AMB_PANTALLA && pantalla != null ? `${temps(pantalla)} de xarxes i jocs` : ''].filter(Boolean).join(' i ');
 	const gimnasos = setmanaDe(new Date()).filter((d) => a.dies[d]?.gimnas).length;
 	const n = noves();
 	const msci = estat.dades.mercat?.actius?.find((x) => x.id === 'msci');
 	return `<header class="cap"><span class="sobre">${esc(dataLlarga(avui()))}</span><h1>${salutacio}, Arnau</h1>${frase ? `<p>${esc(frase[0].toUpperCase() + frase.slice(1))}.</p>` : ''}</header>
-	<section class="activitat">${activitatGran(a)}${barresSetmana(a)}
+	${!AMB_ACTIVITAT ? '' : `<section class="activitat">${activitatGran(a)}${barresSetmana(a)}
 		${AMB_GIMNAS ? `<p class="act-peu"><b>${gimnasos} de ${a.objectius.gimnas}</b> dies de gimnàs aquesta setmana</p>` : ''}
 		<button type="button" class="act-mes-boto" data-vista="activitat">Tota l’activitat ${icona('endavant', 16)}</button>
-	</section>
+	</section>`}
 	<div class="resum-fitxes">
 		${fitxaDespeses()}
 		<button type="button" data-vista="noticies">${icona('noticies', 20)}<b>${n ? `${n} ${n === 1 ? 'nova' : 'noves'}` : 'Al dia'}</b><small>Notícies</small></button>
@@ -1387,6 +1390,7 @@ function vistaLector() {
 
 function pintar() {
 	const app = document.getElementById('app');
+	if (!AMB_ACTIVITAT && (estat.vista === 'activitat' || estat.vista === 'iphone')) estat.vista = 'avui';
 	if (estat.error && !estat.dades) {
 		app.innerHTML = `<main class="pantalla"><p class="buit">${esc(estat.error)}</p></main>`;
 		return;
@@ -1400,7 +1404,7 @@ function pintar() {
 	<main class="pantalla">${avisDesat()}${{avui: vistaAvui, activitat: vistaActivitat, llista: vistaLlista, despeses: vistaDespeses, idees: vistaIdees, noticies: vistaNoticies, mercat: vistaMercat, vitrina: vistaVitrina, iphone: vistaIphone}[estat.vista]()}</main>
 	<nav class="pestanyes" aria-label="Seccions">
 		<button type="button" data-vista="avui" aria-pressed="${estat.vista === 'avui'}">${icona('espurna', 20)}<span>Avui</span></button>
-		<button type="button" data-vista="activitat" aria-pressed="${estat.vista === 'activitat'}">${icona('peus', 20)}<span>Activitat</span></button>
+		${AMB_ACTIVITAT ? `<button type="button" data-vista="activitat" aria-pressed="${estat.vista === 'activitat'}">${icona('peus', 20)}<span>Activitat</span></button>` : ''}
 		<button type="button" data-vista="llista" aria-pressed="${estat.vista === 'llista'}">${icona('llista', 20)}<span>Llista</span></button>
 		<button type="button" data-vista="noticies" aria-pressed="${estat.vista === 'noticies'}">${icona('noticies', 20)}<span>Notícies</span>${estat.dades && noves() ? `<i class="pastilla">${noves()}</i>` : ''}</button>
 		<button type="button" data-vista="mercat" aria-pressed="${estat.vista === 'mercat'}">${icona('mercat', 20)}<span>Mercat</span></button>
