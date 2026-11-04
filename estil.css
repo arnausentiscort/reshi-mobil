@@ -236,7 +236,7 @@ img { display: block; max-width: 100%; }
 	/* el lector: una finestra al mig, amb fletxes */
 	.lector { background: var(--fons); }
 	.lector-barra { position: relative; flex: none; justify-content: center; padding: 16px 28px; border-bottom: 1px solid var(--vora); background: var(--fons); }
-	.lector-barra .rodo, .lector-compte, .lector-punts { background: var(--panell); box-shadow: inset 0 0 0 1px var(--vora-forta); backdrop-filter: none; -webkit-backdrop-filter: none; }
+	.lector-barra .rodo, .lector-compte, .lector-punts { color: var(--text); background: var(--panell); box-shadow: inset 0 0 0 1px var(--vora-forta); backdrop-filter: none; -webkit-backdrop-filter: none; }
 	.lector-barra [data-tancar] { position: absolute; left: 28px; }
 	.lector-punts { position: absolute; right: 28px; margin: 0; }
 	.rodo.pas { display: grid; }
@@ -699,6 +699,18 @@ a.trofeu-obrir { text-decoration: none; }
 [data-mode='clar'] .medalla { color: var(--or); }
 [data-mode='clar'] .m-mapa-nom, [data-mode='clar'] .m-mapa-pct { fill: var(--fort); }
 [data-mode='clar'] .m-mapa-pes { fill: rgba(0, 0, 0, 0.6); }
+/* el que tenia colors pensats només per al fosc: el text del lector i les fitxes, els vermells i verds clars, els colors de
+   la llista (més foscos perquè es llegeixin sobre blanc) i les causes del mercat sense foto, que van sobre fosc */
+[data-mode='clar'] .pagina-cos section p, [data-mode='clar'] .fitxa-seccio p, [data-mode='clar'] .fitxa-seccio ul { color: var(--text); }
+[data-mode='clar'] .m-que.dolent, [data-mode='clar'] .m-llibreta-canvi.baixa, [data-mode='clar'] .error .m-llibreta-estat,
+[data-mode='clar'] .m-toca-xip.dolent em, [data-mode='clar'] .act-setmana .act-partit, [data-mode='clar'] .m-linia.baixa polyline { color: var(--dolent); stroke: var(--dolent); }
+[data-mode='clar'] .m-resultat b { color: #12795a; }
+[data-mode='clar'] .ll-grup-nom, [data-mode='clar'] .ll-grup-nom .ll-grup-n, [data-mode='clar'] .ll-icona-cosa { color: color-mix(in srgb, var(--c, var(--or)) 62%, #000); }
+[data-mode='clar'] .ll-icona-cosa.feta { color: var(--bo); }
+[data-mode='clar'] .m-causa:not(.amb-foto) { background: radial-gradient(120% 90% at 85% 0%, rgba(var(--or-rgb), 0.35), transparent 55%), linear-gradient(160deg, #2b2720, #1b1915); }
+[data-mode='clar'] .m-causa .m-causa-xifra b { color: #e5c07b; text-shadow: none; }
+[data-mode='clar'] .fila.vista { opacity: 0.68; }
+[data-mode='clar'] .ha-passat h3 { color: var(--text-2); }
 .mode { margin-left: auto; width: 32px; height: 32px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 10px; color: var(--or); background: var(--panell); box-shadow: inset 0 0 0 1px var(--vora-forta); }
 .mode + .obert { margin-left: 8px; }
 @media (min-width: 760px) {

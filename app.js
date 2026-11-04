@@ -350,6 +350,10 @@ window.addEventListener('online', () => enviarAviat(0));
 
 // --- Activitat: els passos de cada dia i el gimnàs (el mateix que la pàgina Activitat de Reshi, en petit) ---
 const OBJECTIUS = {passos: 10000, gimnas: 2, pantalla: 60};
+// De moment, el gimnàs i el temps de pantalla van amagats: sense rellotge, l'Arnau no els vol apuntar des del mòbil. Les
+// dreceres i les dades hi són igual; per tornar-los a ensenyar, posa-ho a true.
+const AMB_GIMNAS = false;
+const AMB_PANTALLA = false;
 const diaDe = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const avui = () => diaDe(new Date());
 const mil = (x) => Math.round(x).toLocaleString('ca-ES');
@@ -509,9 +513,9 @@ function activitatGran({dies, objectius}) {
 				<svg class="act-anell" viewBox="0 0 120 120" role="img" aria-label="${Math.round(pc * 100)} % de l’objectiu"><circle cx="60" cy="60" r="${R}"/>${pc > 0 ? `<circle class="ple" cx="60" cy="60" r="${R}" stroke-dasharray="${(pc * L).toFixed(1)} ${L.toFixed(1)}"/>` : ''}</svg>
 				<span><small>${quan}</small><b>${passos != null ? mil(passos) : '—'}</b><small>${passos != null ? `${Math.round(pc * 100)} % de ${mil(objectius.passos)}` : 'encara no han arribat'}</small></span>
 			</div>
-			<button type="button" class="act-gimnas gran" data-gimnas aria-pressed="${gimnasAvui}">${icona('pesa', 26)}<b>${gimnasAvui ? 'Gimnàs fet' : 'He anat al gimnàs'}</b><small>${gimnasAvui ? 'toca per treure-ho' : 'un toc i queda apuntat'}</small></button>
+			${AMB_GIMNAS ? `<button type="button" class="act-gimnas gran" data-gimnas aria-pressed="${gimnasAvui}">${icona('pesa', 26)}<b>${gimnasAvui ? 'Gimnàs fet' : 'He anat al gimnàs'}</b><small>${gimnasAvui ? 'toca per treure-ho' : 'un toc i queda apuntat'}</small></button>` : ''}
 		</div>
-		${pantallaFitxa(dies, objectius.pantalla)}`;
+		${AMB_PANTALLA ? pantallaFitxa(dies, objectius.pantalla) : ''}`;
 }
 // la setmana en barres: passos (en daurat els dies de gimnàs, l'escut els partits)
 function barresSetmana({dies, objectius, partits}, gran = false) {
@@ -556,7 +560,7 @@ function mesQuadrets({dies, objectius, partits}) {
 		<div class="act-quadrets">${['dl', 'dt', 'dc', 'dj', 'dv', 'ds', 'dg'].map((x) => `<small>${x}</small>`).join('')}${'<span></span>'.repeat((primer.getDay() + 6) % 7)}${delMes
 			.map((d) => `<span class="q ${nivell(dies[d]?.passos)} ${dies[d]?.gimnas ? 'gimnas' : ''} ${d === avui() ? 'avui' : ''} ${d > avui() ? 'futur' : ''}">${Number(d.slice(8))}${partits.has(d) ? '<i></i>' : ''}</span>`)
 			.join('')}</div>
-		<p class="act-peu">${m != null ? `<b>${mil(m)}</b> passos al dia de mitjana` : 'Aquest mes no hi ha passos'} · <b>${gimnasos}</b> ${gimnasos === 1 ? 'dia' : 'dies'} de gimnàs</p>`;
+		<p class="act-peu">${m != null ? `<b>${mil(m)}</b> passos al dia de mitjana` : 'Aquest mes no hi ha passos'} ${AMB_GIMNAS ? ` · <b>${gimnasos}</b> ${gimnasos === 1 ? 'dia' : 'dies'} de gimnàs` : ''}</p>`;
 }
 
 // la fitxa dels diners de l'Avui: el que s'ha gastat l'últim mes sencer (o el d'ara), i porta a les Despeses
@@ -573,17 +577,17 @@ function vistaAvui() {
 	const salutacio = h < 6 ? 'Bona nit' : h < 14 ? 'Bon dia' : h < 21 ? 'Bona tarda' : 'Bona nit';
 	if (!estat.personal)
 		return `<header class="cap"><span class="sobre">${esc(dataLlarga(avui()))}</span><h1>${salutacio}, Arnau</h1></header>
-	${formCodi('La teva part', 'Posa el codi per veure els teus passos, el gimnàs, el temps de pantalla i els diners. El mòbil el recordarà.')}`;
+	${formCodi('La teva part', 'Posa el codi per veure els teus passos i els diners. El mòbil el recordarà.')}`;
 	const a = dadesActivitat();
 	const {quan, passos} = passosRecents(a.dies);
 	const pantalla = totalPantalla(a.dies[avui()]?.pantalla ?? a.dies[ahir()]?.pantalla);
-	const frase = [passos != null ? `${quan.toLowerCase()} has fet ${mil(passos)} passos` : '', pantalla != null ? `${temps(pantalla)} de xarxes i jocs` : ''].filter(Boolean).join(' i ');
+	const frase = [passos != null ? `${quan.toLowerCase()} has fet ${mil(passos)} passos` : '', AMB_PANTALLA && pantalla != null ? `${temps(pantalla)} de xarxes i jocs` : ''].filter(Boolean).join(' i ');
 	const gimnasos = setmanaDe(new Date()).filter((d) => a.dies[d]?.gimnas).length;
 	const n = noves();
 	const msci = estat.dades.mercat?.actius?.find((x) => x.id === 'msci');
 	return `<header class="cap"><span class="sobre">${esc(dataLlarga(avui()))}</span><h1>${salutacio}, Arnau</h1>${frase ? `<p>${esc(frase[0].toUpperCase() + frase.slice(1))}.</p>` : ''}</header>
 	<section class="activitat">${activitatGran(a)}${barresSetmana(a)}
-		<p class="act-peu"><b>${gimnasos} de ${a.objectius.gimnas}</b> dies de gimnàs aquesta setmana</p>
+		${AMB_GIMNAS ? `<p class="act-peu"><b>${gimnasos} de ${a.objectius.gimnas}</b> dies de gimnàs aquesta setmana</p>` : ''}
 		<button type="button" class="act-mes-boto" data-vista="activitat">Tota l’activitat ${icona('endavant', 16)}</button>
 	</section>
 	<div class="resum-fitxes">
@@ -598,7 +602,7 @@ function vistaAvui() {
 
 // Activitat sencera: avui, el gimnàs i la ratxa, la setmana de passos i de pantalla, i el mes en quadrets
 function vistaActivitat() {
-	const cap = `<header class="cap"><span class="sobre">Activitat</span><h1>La teva setmana</h1><p>Els passos arriben sols cada nit, el gimnàs amb un toc i el temps de pantalla de les xarxes i els jocs.</p></header>`;
+	const cap = `<header class="cap"><span class="sobre">Activitat</span><h1>La teva setmana</h1><p>${AMB_GIMNAS || AMB_PANTALLA ? 'Els passos arriben sols cada nit, el gimnàs amb un toc i el temps de pantalla de les xarxes i els jocs.' : 'Els passos arriben sols cada nit des de l’iPhone.'}</p></header>`;
 	if (!estat.personal) return `${cap}${formCodi('La teva activitat', 'Posa el codi per veure-la.')}`;
 	const a = dadesActivitat();
 	const gimnasos = setmanaDe(new Date()).filter((d) => a.dies[d]?.gimnas).length;
@@ -607,12 +611,12 @@ function vistaActivitat() {
 	return `${cap}
 	${connectat ? '' : `<button type="button" class="ip-entrada" data-vista="iphone">${icona('mobil', 20)}<span><b>Connecta l’iPhone</b><small>Encara no ha arribat cap dia de passos. Aquí tens com fer-ho, pas a pas.</small></span>${icona('endavant', 16)}</button>`}
 	<section class="activitat">${activitatGran(a)}</section>
-	<div class="resum-fitxes xifres">
+	${AMB_GIMNAS ? `<div class="resum-fitxes xifres">
 		<div>${icona('pesa', 18)}<b>${gimnasos}/${a.objectius.gimnas}</b><small>Gimnàs aquesta setmana</small></div>
 		<div>${icona('espurna', 18)}<b>${ratxa}</b><small>${ratxa === 1 ? 'Setmana de ratxa' : 'Setmanes de ratxa'}</small></div>
-	</div>
-	<section class="activitat"><h2 class="etiqueta">${icona('peus', 12)} Passos d’aquesta setmana</h2>${barresSetmana(a, true)}<p class="act-peu">La ratlla és l’objectiu (${mil(a.objectius.passos)}). En daurat, els dies de gimnàs; l’escut, els partits del Real Tiesada.</p></section>
-	<section class="activitat"><h2 class="etiqueta">${icona('mobil', 12)} Temps de pantalla</h2>${pantallaSetmana(a)}<p class="act-llegenda"><span><i class="xarxes"></i>Xarxes</span><span><i class="jocs"></i>Jocs</span></p></section>
+	</div>` : ''}
+	<section class="activitat"><h2 class="etiqueta">${icona('peus', 12)} Passos d’aquesta setmana</h2>${barresSetmana(a, true)}<p class="act-peu">La ratlla és l’objectiu (${mil(a.objectius.passos)}).${AMB_GIMNAS ? ' En daurat, els dies de gimnàs;' : ''} L’escut, els partits del Real Tiesada.</p></section>
+	${AMB_PANTALLA ? `<section class="activitat"><h2 class="etiqueta">${icona('mobil', 12)} Temps de pantalla</h2>${pantallaSetmana(a)}<p class="act-llegenda"><span><i class="xarxes"></i>Xarxes</span><span><i class="jocs"></i>Jocs</span></p></section>` : ''}
 	<section class="activitat"><h2 class="etiqueta">${icona('calendari', 12)} El mes</h2>${mesQuadrets(a)}</section>
 	${connectat ? `<button type="button" class="act-mes-boto" data-vista="iphone">${icona('mobil', 16)} Les dreceres de l’iPhone</button>` : ''}`;
 }
@@ -635,7 +639,7 @@ function pasIphone(n, titol, quan, fet, cos) {
 	</details>`;
 }
 function vistaIphone() {
-	const cap = `<header class="cap"><span class="sobre">Activitat</span><h1>Connecta l’iPhone</h1><p>Tres dreceres i els passos, el gimnàs i el temps de pantalla arriben sols. Es fan un sol cop, a l’app Dreceres, en aquest ordre. Cada pas es marca sol quan funciona.</p></header>`;
+	const cap = `<header class="cap"><span class="sobre">Activitat</span><h1>Connecta l’iPhone</h1><p>${AMB_GIMNAS || AMB_PANTALLA ? 'Tres dreceres i els passos, el gimnàs i el temps de pantalla arriben sols.' : 'Una drecera i els passos arriben sols cada nit.'} Es fan un sol cop, a l’app Dreceres, en aquest ordre. Cada pas es marca sol quan funciona.</p></header>`;
 	if (!estat.personal) return `${cap}${formCodi('Connecta l’iPhone', 'Posa el codi per començar.')}`;
 	const {dies} = dadesActivitat();
 	const app = navigator.standalone || matchMedia('(display-mode: standalone)').matches;
@@ -649,7 +653,7 @@ function vistaIphone() {
 			? `<p>Les dreceres obren Reshi al <b>Safari</b>, i el Safari no veu el codi que has posat a la icona. Copia l’enllaç, obre’l al Safari, posa-hi el codi i ja el recordarà.</p>${copiar(WEB)}`
 			: `<p>Ja ets al Safari i amb el codi posat: aquest pas ja està.</p>`,
 	)}
-	${pasIphone(
+	${!AMB_GIMNAS ? '' : pasIphone(
 		1,
 		'Gimnàs, amb un toc',
 		'Dos minuts. Una drecera de dues accions.',
@@ -664,7 +668,7 @@ function vistaIphone() {
 		<p class="ip-extra">Per tenir-la a mà: <b>Configuració → Accessibilitat → Tocar → Tocar el darrere → Doble toc → Gimnàs</b>. Dos copets a l’esquena del mòbil i fet.</p>`,
 	)}
 	${pasIphone(
-		2,
+		AMB_GIMNAS ? 2 : 1,
 		'Passos, cada nit sols',
 		'Cinc minuts. Una drecera i una automatització.',
 		arribat(dies, 'passos'),
@@ -679,8 +683,8 @@ function vistaIphone() {
 		<p><b>Que vagi sola.</b> Pestanya <b>Automatització</b> → <b>+</b> → <b>Hora del dia</b>: <b>23:00</b>, <b>Cada dia</b> → <b>Executar immediatament</b> → tria <b>Passos Reshi</b>.</p>
 		<p class="ip-extra">Si alguna nit no arriba, és que el mòbil estava bloquejat (llavors l’iPhone no deixa llegir Salut). Canvia l’automatització a <b>Executar després de confirmar</b>: a les 23:00 et sortirà un avís i amb un toc s’envia.</p>`,
 	)}
-	${pasIphone(
-		3,
+	${!AMB_PANTALLA ? '' : pasIphone(
+		AMB_GIMNAS ? 3 : 2,
 		'Temps de pantalla (xarxes i jocs)',
 		'Deu minuts. Quatre automatitzacions iguals i tres accions més a Passos Reshi.',
 		arribat(dies, 'pantalla'),
