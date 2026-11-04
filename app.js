@@ -3,7 +3,7 @@
 // t'importa" de cada notícia, les notes dels projectes i l'activitat (passos i gimnàs). El codi es posa un cop i el mòbil
 // el recorda. Els passos arriben amb una drecera d'iOS que obre aquesta web amb #passos=8420&dia=2026-11-02 (i el
 // gimnàs, amb #gimnas=1): es desen aquí i van a Reshi per la bústia.
-import {COLOR_RESERVA, COLORS_PARTS, colorVariacio, fetsDe, marquesSobre, perActiu, squarify} from './grafics.js';
+import {COLOR_RESERVA, COLORS_PARTS, colorDe, colorVariacio, fetsDe, marquesSobre, perActiu, squarify} from './grafics.js';
 import {ICONES} from './icones.js';
 
 const TEMES = {
@@ -724,6 +724,8 @@ function dadesCoses() {
 	const r = estat.cosesReshi;
 	return {coses: r?.coses ?? [], projectes: r?.projectes ?? []};
 }
+// el color del grup de cada cosa: el del seu projecte, o el de "Per a mi" i "Regals" (els mateixos que a Reshi)
+const colorCosa = (c) => colorDe(c.projecte ?? (c.regal ? 'regals' : 'meu'));
 function filaCosa(c, ambProjecte) {
 	const on = c.on || (c.enllac ? botiga(c.enllac) : '');
 	const cos = `<span class="ll-icona-cosa ${c.estat === 'comprada' ? 'feta' : ''}">${icona(c.estat === 'comprada' ? 'fet' : `c-${c.icona ?? 'paquet'}`, 20)}</span>
@@ -734,7 +736,7 @@ function filaCosa(c, ambProjecte) {
 			ambProjecte && c.projecte_nom ? `<span class="ll-xip">${esc(c.projecte_nom)}</span>` : '',
 		].join('')}</small></span>
 		<span class="ll-preu">${c.preu != null ? preuEur(c.preu) : '<em>per mirar</em>'}</span>`;
-	return `<li class="ll-cosa ${c.estat === 'comprada' ? 'comprada' : ''}">${
+	return `<li class="ll-cosa ${c.estat === 'comprada' ? 'comprada' : ''}" style="--c:${colorCosa(c)}">${
 		c.enllac && /^https:\/\//.test(c.enllac) ? `<a href="${esc(c.enllac)}" target="_blank" rel="noopener">${cos}${icona('fletxa', 14)}</a>` : `<div>${cos}</div>`
 	}</li>`;
 }
@@ -761,13 +763,13 @@ function vistaLlista() {
 		grups.set(k, [...(grups.get(k) ?? []), c]);
 	}
 	return `${cap}
-	<nav class="filtres" aria-label="Filtres de la llista">${filtres.map(([id, nom, n]) => `<button type="button" data-filtre-llista="${esc(id)}" aria-pressed="${f === id}">${esc(nom)} <small>${n}</small></button>`).join('')}</nav>
+	<nav class="filtres" aria-label="Filtres de la llista">${filtres.map(([id, nom, n]) => `<button type="button" data-filtre-llista="${esc(id)}" aria-pressed="${f === id}" style="--c:${id === 'tot' ? 'var(--or)' : colorDe(id)}">${id === 'tot' ? '' : '<i class="ll-punt"></i>'}${esc(nom)} <small>${n}</small></button>`).join('')}</nav>
 	${regals.length ? `<button type="button" class="act-mes-boto" data-carta>${icona('regal', 16)} Carta de regals (${regals.length})</button>` : ''}
 	<p class="ll-xifres"><span><b>${vull.length}</b> per comprar${suma(vull) ? ` · ${preuEur(suma(vull))}` : ''}</span><span>Gastat: <b>${preuEur(suma(comprades))}</b></span></p>
 	${
 		vull.length
 			? [...grups.entries()]
-					.map(([nom, l]) => `${nom ? `<h2 class="ll-grup-nom">${esc(nom)} <small>${preuEur(suma(l))}</small></h2>` : ''}<ul class="ll-llista">${l.map((c) => filaCosa(c, false)).join('')}</ul>`)
+					.map(([nom, l]) => `<section class="ll-grup" style="--c:${colorCosa(l[0])}">${nom ? `<h2 class="ll-grup-nom"><i class="ll-punt"></i>${esc(nom)} <small class="ll-grup-n">${l.length}</small><small>${preuEur(suma(l))}</small></h2>` : ''}<ul class="ll-llista">${l.map((c) => filaCosa(c, false)).join('')}</ul></section>`)
 					.join('')
 			: '<p class="buit">Res per comprar aquí.</p>'
 	}

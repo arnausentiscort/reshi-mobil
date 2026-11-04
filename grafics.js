@@ -59,6 +59,35 @@ export function colorVariacio(pct) {
 export const COLORS_PARTS = ['#3987e5', '#d95926', '#199e70', '#c98500'];
 export const COLOR_RESERVA = '#5c5b57';
 
+// el color de cada eina i projecte, per reconèixer-los d'un cop d'ull a l'inici i a la llista (els que no hi són, un de la
+// paleta pel nom). "meu" i "regals" són els dos grups de la llista que no són de cap projecte.
+export const COLORS_APPS = {
+	activitat: '#4ade80',
+	llista: '#f5b94a',
+	idees: '#fde047',
+	llar: '#e8916b',
+	despeses: '#38bdf8',
+	noticies: '#7aa2f7',
+	mercat: '#a3e635',
+	tall: '#f0716a',
+	'editor-directos': '#f0716a',
+	memoria: '#c792ea',
+	'vault-memoria': '#c792ea',
+	finde: '#818cf8',
+	boletus: '#d6a05c',
+	'lampara-mesita': '#fcd34d',
+	'real-tiesada-app': '#ef4444',
+	'jocs-performance': '#f472b6',
+	tfm: '#67e8f9',
+	tfg: '#94a3b8',
+	'setup-escriptori': '#60a5fa',
+	domotica: '#2dd4bf',
+	meu: '#a78bfa',
+	regals: '#f472b6',
+};
+const PALETA_APPS = ['#f0a35e', '#2dd4bf', '#fb7185', '#a78bfa', '#facc15', '#60a5fa'];
+export const colorDe = (id) => COLORS_APPS[id] ?? PALETA_APPS[[...String(id)].reduce((t, c) => t + c.charCodeAt(0), 0) % PALETA_APPS.length];
+
 // --- Les notícies i la cartera: a què toca cada notícia i quan va sortir ---
 
 /** El dia de cada notícia que toca `actiu`: el que va entrar (o el de l'edició) i el de cada actualització. Torna
