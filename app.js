@@ -1118,8 +1118,8 @@ function vistaMercat() {
 
 	const signe = (x) => `${x >= 0 ? '+' : '−'}${eur(Math.abs(x))}`;
 	const cartera = c
-		? `<section class="m-bloc">
-		<h2 class="m-titol">Reshi Capital <small>10.000 € ficticis que gestiono jo, amb comissions i impostos de debò</small></h2>
+		? `<section class="m-bloc${plegat('capital') ? ' plegat' : ''}">
+		${titolPlegable('capital', 'Reshi Capital <small>10.000 € ficticis que gestiono jo, amb comissions i impostos de debò</small>', `${eur(c.valor)} · ${signe(c.valor - c.capital)}`)}
 		<div class="m-cartera m-dues">
 			<div class="m-col">
 			<div class="m-cartera-xifres">
@@ -1158,8 +1158,8 @@ function vistaMercat() {
 	const ap = estat.dades.apostes;
 	const preuDe = (x, moneda) => `${x.toLocaleString('ca-ES', {maximumFractionDigits: 2})} ${moneda === 'USD' ? '$' : '€'}`;
 	const apostes = ap
-		? `<section class="m-bloc">
-		<h2 class="m-titol">Reshi Risc <small>1.000 € ficticis en jugades abans que passi alguna cosa: més risc, més emoció</small></h2>
+		? `<section class="m-bloc${plegat('risc') ? ' plegat' : ''}">
+		${titolPlegable('risc', 'Reshi Risc <small>1.000 € ficticis en jugades abans que passi alguna cosa: més risc, més emoció</small>', `${eur(ap.valor)} · ${signe(ap.valor - ap.capital)}`)}
 		<div class="m-cartera">
 			<div class="m-cartera-xifres">
 				<div><span>Val ara</span><b>${eur(ap.valor)}</b><small class="${ap.valor >= ap.capital ? 'puja' : 'baixa'}">${signe(ap.valor - ap.capital)} des del ${dataBarra(ap.inici)}</small></div>
@@ -1598,3 +1598,20 @@ async function arrencar() {
 }
 arrencar();
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+
+// Reshi Capital i Reshi Risc es poden fer petits: el títol fa de botó i se'n recorda (en aquest mòbil)
+function plegat(clau) {
+	return guardat.llegir('reshi-plegat', {})[clau] === true;
+}
+function titolPlegable(clau, titol, resum) {
+	return `<button type="button" class="m-titol m-plegable" data-plegar="${clau}" aria-expanded="${!plegat(clau)}"><span class="m-plegable-nom">${titol}</span><span class="m-plegable-resum">${esc(resum)}</span>${icona('endavant', 18)}</button>`;
+}
+document.addEventListener('click', (ev) => {
+	const b = ev.target.closest('[data-plegar]');
+	if (!b) return;
+	const tots = guardat.llegir('reshi-plegat', {});
+	tots[b.dataset.plegar] = !tots[b.dataset.plegar];
+	guardat.posar('reshi-plegat', tots);
+	b.closest('section')?.classList.toggle('plegat', tots[b.dataset.plegar]);
+	b.setAttribute('aria-expanded', String(!tots[b.dataset.plegar]));
+});

@@ -904,3 +904,13 @@ a.trofeu-obrir { text-decoration: none; }
 .ip-taula td { padding: 6px 6px 6px 0; vertical-align: middle; border-top: 1px solid var(--vora-forta); }
 .ip-taula td:last-child { width: 46%; padding-right: 0; }
 .ip-taula .ip-copiar { flex-direction: column; align-items: flex-start; gap: 2px; margin: 0; padding: 7px 8px; }
+
+/* Reshi Capital i Reshi Risc: el títol fa de botó per fer-los petits */
+.m-plegable { display: flex; align-items: center; gap: 8px; width: 100%; padding: 0; border: 0; text-align: left; background: none; }
+.m-plegable-nom { display: flex; flex: 1; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; min-width: 0; }
+.m-plegable-resum { display: none; flex: none; font-family: var(--mono); font-size: 14px; font-weight: 800; color: var(--text-2); }
+.m-plegable > svg { flex: none; color: var(--text-3); transform: rotate(90deg); transition: transform 0.25s var(--molla); }
+.m-bloc.plegat > :not(.m-plegable) { display: none; }
+.m-bloc.plegat .m-plegable-resum { display: inline; }
+.m-bloc.plegat .m-plegable-nom small { display: none; }
+.m-bloc.plegat .m-plegable > svg { transform: none; }
