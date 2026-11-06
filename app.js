@@ -1072,7 +1072,33 @@ function vistaMercat() {
 	const c = estat.dades.cartera_prova;
 	if (!m) return '<p class="buit">Encara no hi ha dades del mercat.</p>';
 	const noticia = (id) => estat.dades.edicio.targetes.find((t) => t.id === id);
-	const comEsta = `<section class="m-resum">
+	// els moviments forts dels últims dies (la borsa o les cripto movent-se molt en un sol dia), amb la notícia que ho explica
+	const perDia = new Map();
+	for (const x of m.moviments ?? []) perDia.set(x.data, [...(perDia.get(x.data) ?? []), x]);
+	const seguentDia = (s) => {
+		const d = dia(s);
+		d.setDate(d.getDate() + 1);
+		return diaDe(d);
+	};
+	const moviments = perDia.size
+		? `<section class="m-moviments"><span class="etiqueta">⚡ Moviments forts dels últims dies</span>${[...perDia.entries()]
+				.slice(0, 3)
+				.map(([d, ms]) => {
+					// la notícia que ho explica: d'aquell dia o de l'endemà, de borsa si s'ha mogut la borsa (té preferència), de cripto si les cripto
+					const borsa = ms.some((x) => ['msci', 'sp500', 'nasdaq'].includes(x.id));
+					const cripto = ms.some((x) => x.id === 'btc' || x.id === 'eth');
+					const punts = (x) => (x.tema === 'mercat' && borsa ? 2 : 0) + (x.tema === 'cripto' && cripto ? 1 : 0) + (x.nova === seguentDia(d) ? 0.5 : 0);
+					const n = estat.dades.edicio.targetes
+						.filter((x) => (x.tema === 'mercat' || x.tema === 'cripto') && x.nova && x.nova >= d && x.nova <= seguentDia(d) && punts(x) >= 1)
+						.sort((a, b) => punts(b) - punts(a))[0];
+					return `<div class="m-moviment-dia"><b>${esc(dataCurta(d))}</b><span class="m-moviment-coses">${ms
+						.sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct))
+						.map((x) => `<span class="${x.pct < 0 ? 'baixa' : 'puja'}">${x.pct < 0 ? '↘' : '↗'} ${esc(x.nom)} ${pct(x.pct)}</span>`)
+						.join('')}</span>${n ? `<button type="button" class="m-perque" data-noticia-mercat="${n.id}">Per què? →</button>` : ''}</div>`;
+				})
+				.join('')}</section>`
+		: '';
+	const comEsta = `${moviments}<section class="m-resum">
 		<span class="etiqueta">${icona('mercat', 12)} Aquesta setmana${s?.to ? `<em>${esc(s.to)}</em>` : ''}</span>
 		<p>${esc(s?.resum ?? 'Encara no hi ha l’anàlisi d’aquesta setmana.')}</p>
 	</section>
@@ -1084,7 +1110,7 @@ function vistaMercat() {
 		<span class="m-preu">${preu(a)}</span>
 		${linia(a.serie, a.canvis.mes >= 0, marquesSobre(a.serie, a.dates, fetsDe(estat.dades.edicio.targetes, a.id, estat.dades.edicio.data)))}
 		${s?.actius?.[a.id] ? `<p>${esc(s.actius[a.id])}</p>` : ''}
-		<small class="m-mes">Un mes: ${pct(a.canvis.mes)}</small>
+		<small class="m-mes">${a.canvis.dia !== undefined && a.dia_data ? `<span class="m-dia ${Math.abs(a.canvis.dia) >= 1.5 ? (a.canvis.dia < 0 ? 'baixa fort' : 'puja fort') : ''}">${esc(dataCurta(a.dia_data))}: ${pct(a.canvis.dia)}</span> · ` : ''}Un mes: ${pct(a.canvis.mes)}</small>
 	</article>`,
 		)
 		.join('')}
