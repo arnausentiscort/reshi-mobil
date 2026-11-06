@@ -859,7 +859,12 @@ const preu = (a) =>
 		? a.preu.toLocaleString('ca-ES', {minimumFractionDigits: 3, maximumFractionDigits: 3})
 		: `${a.preu.toLocaleString('ca-ES', {maximumFractionDigits: a.preu > 1000 ? 0 : 2})} ${a.moneda === 'EUR' ? '€' : '$'}`;
 // l'últim mes; a sobre, un punt el dia que va sortir cada notícia que hi toca (amb el número si n'hi ha més d'una)
-const linia = (serie, puja, marques = []) => {
+// Al Mercat només hi surten aquests gràfics, en gran (l'or, el petroli i la resta no li importen; les dades es calculen igual)
+const GRAFICS = ['msci', 'btc'];
+const AMB_BCE = false;
+// l'avís de moviments forts només parla de la borsa i les cripto
+const FORA_DE_L_AVIS = ['or', 'brent', 'eurusd'];
+const linia = (serie, puja, marques = [], eixos = null) => {
 	const min = Math.min(...serie);
 	const max = Math.max(...serie);
 	const pts = serie.map((v, i) => `${((i / (serie.length - 1)) * 100).toFixed(2)},${(30 - ((v - min) / (max - min || 1)) * 26 - 2).toFixed(2)}`).join(' ');
@@ -868,7 +873,11 @@ const linia = (serie, puja, marques = []) => {
 			(x) =>
 				`<button type="button" class="m-marca ${x.efecte} ${x.fets.length > 1 ? 'moltes' : ''}" style="left:${x.x}%;top:${(x.y / 30) * 100}%" data-noticia-cartera="${x.fets[0].id}" aria-label="${x.fets.length} notícies del ${dataBarra(x.data)}" title="${esc(x.fets.map((f) => f.titol).join(' · '))}">${x.fets.length > 1 ? x.fets.length : ''}</button>`,
 		)
-		.join('')}</div>`;
+		.join('')}${
+		eixos
+			? `<span class="m-eix-dates"><span>${eixos.dates?.length ? esc(dataCurta(eixos.dates[0])) : ''}</span><span class="m-eix-mm">mín. ${esc(eixos.fmt(min))} · màx. ${esc(eixos.fmt(max))}</span><span>${eixos.dates?.length ? esc(dataCurta(eixos.dates[eixos.dates.length - 1])) : ''}</span></span>`
+			: ''
+	}</div>`;
 };
 const dataBarra = (s) => s.split('-').reverse().join('/');
 const diners = (x) => (x >= 1e6 ? `${Math.round(x / 1e6).toLocaleString('ca-ES')} M$` : `${Math.round(x / 1e3).toLocaleString('ca-ES')} mil $`);
@@ -1074,7 +1083,7 @@ function vistaMercat() {
 	const noticia = (id) => estat.dades.edicio.targetes.find((t) => t.id === id);
 	// els moviments forts dels últims dies (la borsa o les cripto movent-se molt en un sol dia), amb la notícia que ho explica
 	const perDia = new Map();
-	for (const x of m.moviments ?? []) perDia.set(x.data, [...(perDia.get(x.data) ?? []), x]);
+	for (const x of (m.moviments ?? []).filter((x) => !FORA_DE_L_AVIS.includes(x.id))) perDia.set(x.data, [...(perDia.get(x.data) ?? []), x]);
 	const seguentDia = (s) => {
 		const d = dia(s);
 		d.setDate(d.getDate() + 1);
@@ -1103,18 +1112,18 @@ function vistaMercat() {
 		<p>${esc(s?.resum ?? 'Encara no hi ha l’anàlisi d’aquesta setmana.')}</p>
 	</section>
 	${m.termometres ? `<div class="m-termos">${m.termometres.borsa ? termo('Borsa', m.termometres.borsa, 'borsa') : ''}${m.termometres.cripto ? termo('Cripto', m.termometres.cripto, 'cripto') : ''}</div>` : ''}
-	<div class="m-actius">${m.actius
+	<div class="m-actius grans">${GRAFICS.flatMap((id) => m.actius.filter((a) => a.id === id))
 		.map(
-			(a) => `<article class="m-actiu ${a.canvis.setmana >= 0 ? 'puja' : 'baixa'}">
+			(a) => `<article class="m-actiu gran ${a.canvis.setmana >= 0 ? 'puja' : 'baixa'}">
 		<header><b>${esc(a.nom)}</b><span class="m-setmana ${a.canvis.setmana > 0 ? 'puja' : a.canvis.setmana < 0 ? 'baixa' : ''}">${a.canvis.setmana >= 0 ? '↗' : '↘'} ${pct(a.canvis.setmana)}</span></header>
 		<span class="m-preu">${preu(a)}</span>
-		${linia(a.serie, a.canvis.mes >= 0, marquesSobre(a.serie, a.dates, fetsDe(estat.dades.edicio.targetes, a.id, estat.dades.edicio.data)))}
+		${linia(a.serie, a.canvis.mes >= 0, marquesSobre(a.serie, a.dates, fetsDe(estat.dades.edicio.targetes, a.id, estat.dades.edicio.data)), {dates: a.dates, fmt: (v) => preu({...a, preu: v})})}
 		${s?.actius?.[a.id] ? `<p>${esc(s.actius[a.id])}</p>` : ''}
 		<small class="m-mes">${a.canvis.dia !== undefined && a.dia_data ? `<span class="m-dia ${Math.abs(a.canvis.dia) >= 1.5 ? (a.canvis.dia < 0 ? 'baixa fort' : 'puja fort') : ''}">${esc(dataCurta(a.dia_data))}: ${pct(a.canvis.dia)}</span> · ` : ''}Un mes: ${pct(a.canvis.mes)}</small>
 	</article>`,
 		)
 		.join('')}
-		${m.tipus_bce !== undefined ? `<article class="m-actiu m-bce"><header><b>Tipus del BCE</b></header><span class="m-preu">${m.tipus_bce.toLocaleString('ca-ES', {minimumFractionDigits: 2})} %</span>${s?.actius?.compte ? `<p>${esc(s.actius.compte)}</p>` : ''}</article>` : ''}
+		${AMB_BCE && m.tipus_bce !== undefined ? `<article class="m-actiu m-bce"><header><b>Tipus del BCE</b></header><span class="m-preu">${m.tipus_bce.toLocaleString('ca-ES', {minimumFractionDigits: 2})} %</span>${s?.actius?.compte ? `<p>${esc(s.actius.compte)}</p>` : ''}</article>` : ''}
 	</div>
 	<p class="m-peu">Preus del ${dataBarra(m.actualitzat.slice(0, 10))} a les ${m.actualitzat.slice(11)}.</p>`;
 

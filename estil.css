@@ -927,3 +927,34 @@ a.trofeu-obrir { text-decoration: none; }
 .m-dia.fort { font-weight: 800; }
 .m-dia.baixa.fort { color: var(--dolent); }
 .m-dia.puja.fort { color: var(--bo); }
+
+/* Mercat: només el MSCI World i el bitcoin, en gran, amb el màxim, el mínim i les dates */
+.m-actius.grans { grid-template-columns: 1fr; gap: 12px; }
+.m-actiu.gran { gap: 7px; padding: 16px; }
+.m-actiu.gran header b { font-size: 15px; }
+.m-actiu.gran .m-setmana { font-size: 14px; }
+.m-actiu.gran .m-preu { font-size: 28px; }
+.m-actiu.gran .m-grafic { margin: 2px 0 18px; }
+.m-actiu.gran .m-linia { height: 150px; }
+.m-actiu.gran .m-linia polyline { stroke-width: 2.2; }
+.m-eix-max, .m-eix-min { position: absolute; right: 0; padding: 1px 6px; border-radius: 6px; font-family: var(--mono); font-size: 10.5px; color: var(--text-3); background: color-mix(in srgb, var(--panell) 80%, transparent); pointer-events: none; }
+.m-eix-max { top: 0; }
+.m-eix-min { bottom: 0; }
+.m-eix-dates { position: absolute; left: 0; right: 0; bottom: -18px; display: flex; justify-content: space-between; font-family: var(--mono); font-size: 10.5px; color: var(--text-3); pointer-events: none; }
+@media (min-width: 760px) {
+	.m-actius.grans { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+	.m-actiu.gran .m-linia { height: 190px; }
+}
+
+.m-eix-dates { gap: 8px; }
+.m-eix-mm { color: var(--text-2); white-space: nowrap; }
+/* al mòbil no hi cap tot en una línia: les dates a dalt i el mínim i el màxim a sota */
+.m-eix-dates { flex-wrap: wrap; row-gap: 3px; bottom: auto; top: calc(100% + 4px); }
+.m-eix-dates > span { white-space: nowrap; }
+.m-eix-mm { order: 3; width: 100%; text-align: center; }
+.m-actiu.gran .m-grafic { margin-bottom: 36px; }
+@media (min-width: 760px) {
+	.m-eix-mm { order: 0; width: auto; }
+	.m-eix-dates { flex-wrap: nowrap; }
+	.m-actiu.gran .m-grafic { margin-bottom: 20px; }
+}
