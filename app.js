@@ -575,6 +575,20 @@ function fitxaDespeses() {
 	return `<button type="button" data-vista="despeses" class="gran">${icona('diners', 20)}<b>${eur(d[mes].despesa)}</b><small>Gastat ${/^[AEIOU]/.test(NOMS_MESOS[Number(mes.slice(5, 7)) - 1]) ? 'a l’' : 'al '}${NOMS_MESOS[Number(mes.slice(5, 7)) - 1].toLowerCase()} · estalvi ${eur(d[mes].ingressos - d[mes].despesa)}</small></button>`;
 }
 // Avui: el resum de l'Arnau. L'activitat al davant, i després com van les notícies i els diners, i la nota per a Reshi
+// la fitxa del Mercat a Avui: el MSCI World (el teu pla) amb el preu, el canvi del dia i de la setmana i la línia del mes;
+// i, si els últims dies hi ha hagut un moviment fort, ho diu aquí mateix
+function fitxaMercat(msci) {
+	if (!msci) return `<button type="button" class="gran" data-vista="mercat">${icona('mercat', 20)}<b>Mercat</b><small>Com està la borsa</small></button>`;
+	const fort = (estat.dades.mercat?.moviments ?? []).filter((x) => !FORA_DE_L_AVIS.includes(x.id)).sort((a, b) => b.data.localeCompare(a.data) || Math.abs(b.pct) - Math.abs(a.pct))[0];
+	const dia = msci.canvis.dia;
+	return `<button type="button" class="gran avui-mercat ${msci.canvis.mes >= 0 ? 'puja' : 'baixa'}" data-vista="mercat">
+		<span class="avui-mercat-cap"><span class="etiqueta">${icona('mercat', 12)} El teu MSCI World</span><span class="avui-mercat-mes ${msci.canvis.setmana >= 0 ? 'puja' : 'baixa'}">${msci.canvis.setmana >= 0 ? '↗' : '↘'} ${pct(msci.canvis.setmana)} la setmana</span></span>
+		<span class="avui-mercat-cos"><strong>${preu(msci)}</strong>${dia !== undefined && msci.dia_data ? `<span class="avui-mercat-dia ${dia < 0 ? 'baixa' : 'puja'}">${esc(dataCurta(msci.dia_data))} ${pct(dia)}</span>` : ''}</span>
+		${linia(msci.serie, msci.canvis.mes >= 0)}
+		${fort ? `<span class="avui-mercat-fort">⚡ ${esc(dataCurta(fort.data))}: ${esc(fort.nom)} ${pct(fort.pct)}${fort.pct < 0 ? ' — toca saber per què' : ''}<em>Mercat →</em></span>` : `<span class="avui-mercat-fort calma">Cap moviment fort els últims dies<em>Mercat →</em></span>`}
+	</button>`;
+}
+
 function vistaAvui() {
 	const h = new Date().getHours();
 	const salutacio = h < 6 ? 'Bona nit' : h < 14 ? 'Bon dia' : h < 21 ? 'Bona tarda' : 'Bona nit';
@@ -596,7 +610,7 @@ function vistaAvui() {
 	<div class="resum-fitxes">
 		${fitxaDespeses()}
 		<button type="button" data-vista="noticies">${icona('noticies', 20)}<b>${n ? `${n} ${n === 1 ? 'nova' : 'noves'}` : 'Al dia'}</b><small>Notícies</small></button>
-		<button type="button" data-vista="mercat">${icona('mercat', 20)}<b>${msci ? pct(msci.canvis.setmana) : '—'}</b><small>El MSCI World, la setmana</small></button>
+		${fitxaMercat(msci)}
 		<button type="button" data-vista="llista">${icona('llista', 20)}<b>${dadesCoses().coses.filter((c) => c.estat !== 'comprada').length}</b><small>Coses per comprar</small></button>
 		<button type="button" data-vista="vitrina">${icona('vitrina', 20)}<b>Vitrina</b><small>El que has fet</small></button>
 	</div>
@@ -1090,7 +1104,7 @@ function vistaMercat() {
 		return diaDe(d);
 	};
 	const moviments = perDia.size
-		? `<section class="m-moviments"><span class="etiqueta">⚡ Moviments forts dels últims dies</span>${[...perDia.entries()]
+		? `<section class="m-forts"><span class="etiqueta">⚡ Moviments forts dels últims dies</span>${[...perDia.entries()]
 				.slice(0, 3)
 				.map(([d, ms]) => {
 					// la notícia que ho explica: d'aquell dia o de l'endemà, de borsa si s'ha mogut la borsa (té preferència), de cripto si les cripto
@@ -1107,12 +1121,7 @@ function vistaMercat() {
 				})
 				.join('')}</section>`
 		: '';
-	const comEsta = `${moviments}<section class="m-resum">
-		<span class="etiqueta">${icona('mercat', 12)} Aquesta setmana${s?.to ? `<em>${esc(s.to)}</em>` : ''}</span>
-		<p>${esc(s?.resum ?? 'Encara no hi ha l’anàlisi d’aquesta setmana.')}</p>
-	</section>
-	${m.termometres ? `<div class="m-termos">${m.termometres.borsa ? termo('Borsa', m.termometres.borsa, 'borsa') : ''}${m.termometres.cripto ? termo('Cripto', m.termometres.cripto, 'cripto') : ''}</div>` : ''}
-	<div class="m-actius grans">${GRAFICS.flatMap((id) => m.actius.filter((a) => a.id === id))
+	const comEsta = `${moviments}<div class="m-actius grans">${GRAFICS.flatMap((id) => m.actius.filter((a) => a.id === id))
 		.map(
 			(a) => `<article class="m-actiu gran ${a.canvis.setmana >= 0 ? 'puja' : 'baixa'}">
 		<header><b>${esc(a.nom)}</b><span class="m-setmana ${a.canvis.setmana > 0 ? 'puja' : a.canvis.setmana < 0 ? 'baixa' : ''}">${a.canvis.setmana >= 0 ? '↗' : '↘'} ${pct(a.canvis.setmana)}</span></header>
@@ -1125,6 +1134,11 @@ function vistaMercat() {
 		.join('')}
 		${AMB_BCE && m.tipus_bce !== undefined ? `<article class="m-actiu m-bce"><header><b>Tipus del BCE</b></header><span class="m-preu">${m.tipus_bce.toLocaleString('ca-ES', {minimumFractionDigits: 2})} %</span>${s?.actius?.compte ? `<p>${esc(s.actius.compte)}</p>` : ''}</article>` : ''}
 	</div>
+<section class="m-resum">
+		<span class="etiqueta">${icona('mercat', 12)} Aquesta setmana${s?.to ? `<em>${esc(s.to)}</em>` : ''}</span>
+		<p>${esc(s?.resum ?? 'Encara no hi ha l’anàlisi d’aquesta setmana.')}</p>
+	</section>
+	${m.termometres ? `<div class="m-termos">${m.termometres.borsa ? termo('Borsa', m.termometres.borsa, 'borsa') : ''}${m.termometres.cripto ? termo('Cripto', m.termometres.cripto, 'cripto') : ''}</div>` : ''}
 	<p class="m-peu">Preus del ${dataBarra(m.actualitzat.slice(0, 10))} a les ${m.actualitzat.slice(11)}.</p>`;
 
 	const f = estat.filtreToca;

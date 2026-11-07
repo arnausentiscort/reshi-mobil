@@ -528,9 +528,9 @@ img { display: block; max-width: 100%; }
 .m-actiu.baixa { box-shadow: inset 0 2px 0 rgba(229, 83, 75, 0.7), inset 0 0 0 1px var(--vora); }
 .m-linia.puja polyline { filter: drop-shadow(0 0 3px rgba(74, 222, 128, 0.6)); }
 .m-linia.baixa polyline { filter: drop-shadow(0 0 3px rgba(229, 83, 75, 0.6)); }
-.m-linia polyline { stroke-dasharray: 400; stroke-dashoffset: 400; animation: dibuixa 1.4s cubic-bezier(0.32, 0.72, 0, 1) 0.2s forwards; }
+.m-linia { animation: dibuixa 1.4s cubic-bezier(0.32, 0.72, 0, 1) 0.2s both; }
 .m-linia polygon { opacity: 0; animation: apareix-a 0.8s ease 0.9s forwards; }
-@keyframes dibuixa { to { stroke-dashoffset: 0; } }
+@keyframes dibuixa { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
 @keyframes apareix-a { to { opacity: 1; } }
 .m-aposta-barra i, .m-rep-barra i { transform-origin: left center; animation: creix 1s cubic-bezier(0.32, 0.72, 0, 1) both; }
 .m-qui-eix i { animation: creix-centre 0.9s cubic-bezier(0.32, 0.72, 0, 1) both; }
@@ -916,11 +916,12 @@ a.trofeu-obrir { text-decoration: none; }
 .m-bloc.plegat .m-plegable > svg { transform: none; }
 
 /* els moviments forts dels últims dies, a dalt del Mercat */
-.m-moviments { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; padding: 14px; border-radius: 16px; background: rgba(229, 83, 75, 0.08); box-shadow: inset 0 0 0 1px rgba(229, 83, 75, 0.3); }
-.m-moviment-dia { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
-.m-moviment-dia > b { width: 100%; font-size: 13px; font-weight: 800; color: var(--fort); }
-.m-moviment-coses { display: flex; flex: 1; flex-wrap: wrap; gap: 5px; }
-.m-moviment-coses span { padding: 3px 9px; border-radius: 999px; font-family: var(--mono); font-size: 12px; font-weight: 800; }
+.m-forts { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 16px; background: rgba(229, 83, 75, 0.08); box-shadow: inset 0 0 0 1px rgba(229, 83, 75, 0.3); }
+.m-moviment-dia { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 6px; }
+.m-moviment-dia > b { flex: none; margin-right: 2px; font-family: var(--mono); font-size: 12px; font-weight: 800; color: var(--fort); }
+.m-moviment-coses { display: contents; }
+.m-moviment-coses span { padding: 2px 8px; border-radius: 999px; font-family: var(--mono); font-size: 11.5px; font-weight: 800; }
+.m-forts .m-perque { margin-left: auto; height: 28px; padding: 0 10px; font-size: 12px; }
 .m-moviment-coses .baixa { color: var(--dolent); background: rgba(229, 83, 75, 0.12); }
 .m-moviment-coses .puja { color: var(--bo); background: rgba(74, 222, 128, 0.12); }
 .m-perque { height: 32px; padding: 0 12px; border: 0; border-radius: 10px; font-size: 13px; font-weight: 700; color: var(--fort); background: var(--panell); box-shadow: inset 0 0 0 1px var(--vora-forta); }
@@ -958,3 +959,23 @@ a.trofeu-obrir { text-decoration: none; }
 	.m-eix-dates { flex-wrap: nowrap; }
 	.m-actiu.gran .m-grafic { margin-bottom: 20px; }
 }
+
+/* Mercat: el que importa primer; el text de la setmana, més petit */
+.m-resum p { font-size: 16px; line-height: 1.5; }
+@media (min-width: 760px) { .m-resum p { font-size: 20px; } }
+
+/* Avui: la fitxa ampla del Mercat */
+.resum-fitxes > .avui-mercat { gap: 6px; padding: 14px 16px; background: radial-gradient(120% 90% at 100% 0%, rgba(var(--or-rgb), 0.1), transparent 60%), var(--panell); box-shadow: inset 0 0 0 1px rgba(var(--or-rgb), 0.28); }
+.avui-mercat-cap { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 8px; }
+.avui-mercat-cap .etiqueta { display: inline-flex; align-items: center; gap: 6px; }
+.avui-mercat-mes { font-family: var(--mono); font-size: 12px; font-weight: 800; }
+.avui-mercat-mes.puja, .avui-mercat-dia.puja { color: var(--bo); }
+.avui-mercat-mes.baixa, .avui-mercat-dia.baixa { color: var(--dolent); }
+.avui-mercat-cos { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; }
+.avui-mercat-cos strong { font-family: var(--mono); font-size: 30px; font-weight: 800; letter-spacing: -0.02em; color: var(--fort); }
+.avui-mercat-dia { font-family: var(--mono); font-size: 13px; font-weight: 800; }
+.avui-mercat .m-grafic { width: 100%; }
+.avui-mercat .m-linia { height: 64px; }
+.avui-mercat-fort { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 10px; border-radius: 10px; font-size: 12px; font-weight: 700; color: var(--dolent); background: rgba(229, 83, 75, 0.1); }
+.avui-mercat-fort.calma { color: var(--text-3); background: rgba(255, 255, 255, 0.04); }
+.avui-mercat-fort em { flex: none; font-style: normal; font-weight: 800; color: var(--or); }
