@@ -63,7 +63,7 @@ const guardat = {
 const modeClar = () => document.documentElement.dataset.mode === 'clar';
 const posarMode = (m) => {
 	document.documentElement.dataset.mode = m;
-	document.querySelector('meta[name="theme-color"]')?.setAttribute('content', m === 'clar' ? '#f5f3ee' : '#121212');
+	document.querySelector('meta[name="theme-color"]')?.setAttribute('content', m === 'clar' ? '#f5f5f7' : '#0f0f10');
 	guardat.posar('reshi-mode', m);
 };
 posarMode(guardat.llegir('reshi-mode', 'fosc'));
@@ -223,7 +223,7 @@ function vistaNoticies() {
 	const [primera, ...resta] = pendents;
 	const llegides = llista.filter((t) => estat.llegidesAbans.has(t.id));
 	const n = noves();
-	const agenda = e.agenda.filter((a) => a.data >= avui);
+	const agenda = e.agenda.filter((a) => a.data >= avui).slice(0, 5);
 	const fila = (t, i) => `<li><button type="button" class="fila ${estat.vots[t.id] === -1 ? 'sobra' : ''} ${estat.vistes.has(clau(t)) ? 'vista' : ''}" data-obrir="${i}">
 		<span class="fila-text">${etiqueta(t.tema, t.nova, t.actualitzada)}<b>${esc(t.titol)}</b>${abans(t)}${xifra(t)}${toques(t)}</span>
 		${foto(t, 'fila-foto')}
@@ -243,14 +243,6 @@ function vistaNoticies() {
 		}
 	</div>
 	${estat.personal ? '' : formCodi('La part que va per tu', 'Posa el codi i cada notícia et dirà per què t’importa. El mòbil el recordarà.')}
-	${
-		agenda.length
-			? `<section class="agenda" aria-label="Pròximament">
-		<h2 class="etiqueta">${icona('calendari', 12)} Pròximament</h2>
-		<ol>${agenda.map((a) => `<li data-tema="${a.tema}"><b>${esc(dataCurta(a.data))}</b><span>${esc(a.text)}</span></li>`).join('')}</ol>
-	</section>`
-			: ''
-	}
 	<nav class="filtres" aria-label="Temes">${FILTRES.map((f) => {
 		const n = e.targetes.filter((t) => !f.temes || f.temes.includes(t.tema)).length;
 		return `<button type="button" data-filtre="${f.id}" aria-pressed="${estat.filtre === f.id}">${f.nom} <small>${n}</small></button>`;
@@ -272,7 +264,15 @@ function vistaNoticies() {
 	}
 	${
 		e.targetes.length - meves().length
-			? `<button type="button" class="cap-mercat" data-vista="mercat">${icona('mercat', 14)} ${e.targetes.length - meves().length} notícies de mercat: són al Mercat, al costat dels preus</button>`
+			? `<button type="button" class="cap-mercat" data-vista="mercat">${icona('mercat', 14)} ${e.targetes.length - meves().length} notícies de mercat, al Mercat</button>`
+			: ''
+	}
+	${
+		agenda.length
+			? `<section class="agenda" aria-label="Pròximament">
+		<h2 class="etiqueta">${icona('calendari', 12)} Pròximament</h2>
+		<ol>${agenda.map((a) => `<li data-tema="${a.tema}"><b>${esc(dataCurta(a.data))}</b><span>${esc(a.text)}</span></li>`).join('')}</ol>
+	</section>`
 			: ''
 	}
 	`;
@@ -356,6 +356,8 @@ const AMB_GIMNAS = false;
 // i, de moment, tota l'Activitat amagada (la pestanya i el bloc de l'Avui). Els passos que envien les dreceres es continuen
 // desant; per tornar-la a ensenyar, posa-ho a true.
 const AMB_ACTIVITAT = false;
+// les idees (la caixa d'apuntar-ne i la vista) i les etiquetes d'estat de la vitrina no es mostren: no és per ensenyar (ESTIL.md)
+const AMB_IDEES = false;
 const AMB_PANTALLA = false;
 const diaDe = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const avui = () => diaDe(new Date());
@@ -572,7 +574,7 @@ function fitxaDespeses() {
 	if (!d || !Object.keys(d).length) return '';
 	const mesos = Object.keys(d).sort().reverse();
 	const mes = mesos.find((m) => !d[m].incomplet && m < avui().slice(0, 7)) ?? mesos[0];
-	return `<button type="button" data-vista="despeses" class="gran">${icona('diners', 20)}<b>${eur(d[mes].despesa)}</b><small>Gastat ${/^[AEIOU]/.test(NOMS_MESOS[Number(mes.slice(5, 7)) - 1]) ? 'a l’' : 'al '}${NOMS_MESOS[Number(mes.slice(5, 7)) - 1].toLowerCase()} · estalvi ${eur(d[mes].ingressos - d[mes].despesa)}</small></button>`;
+	return `<button type="button" data-vista="despeses">${icona('diners', 20)}<b>${eur(d[mes].despesa)}</b><small>Gastat ${/^[AEIOU]/.test(NOMS_MESOS[Number(mes.slice(5, 7)) - 1]) ? 'a l’' : 'al '}${NOMS_MESOS[Number(mes.slice(5, 7)) - 1].toLowerCase()} · estalvi ${eur(d[mes].ingressos - d[mes].despesa)}</small></button>`;
 }
 // Avui: el resum de l'Arnau. L'activitat al davant, i després com van les notícies i els diners, i la nota per a Reshi
 // la fitxa del Mercat a Avui: el MSCI World (el teu pla) amb el preu, el canvi del dia i de la setmana i la línia del mes;
@@ -585,7 +587,7 @@ function fitxaMercat(msci) {
 		<span class="avui-mercat-cap"><span class="etiqueta">${icona('mercat', 12)} El teu MSCI World</span><span class="avui-mercat-mes ${msci.canvis.setmana >= 0 ? 'puja' : 'baixa'}">${msci.canvis.setmana >= 0 ? '↗' : '↘'} ${pct(msci.canvis.setmana)} la setmana</span></span>
 		<span class="avui-mercat-cos"><strong>${preu(msci)}</strong>${dia !== undefined && msci.dia_data ? `<span class="avui-mercat-dia ${dia < 0 ? 'baixa' : 'puja'}">${esc(dataCurta(msci.dia_data))} ${pct(dia)}</span>` : ''}</span>
 		${linia(msci.serie, msci.canvis.mes >= 0)}
-		${fort ? `<span class="avui-mercat-fort">⚡ ${esc(dataCurta(fort.data))}: ${esc(fort.nom)} ${pct(fort.pct)}${fort.pct < 0 ? ' — toca saber per què' : ''}<em>Mercat →</em></span>` : `<span class="avui-mercat-fort calma">Cap moviment fort els últims dies<em>Mercat →</em></span>`}
+		${fort ? `<span class="avui-mercat-fort">${esc(dataCurta(fort.data))}: ${esc(fort.nom)} ${pct(fort.pct)}${fort.pct < 0 ? '' : ''}<em>Mercat →</em></span>` : `<span class="avui-mercat-fort calma">Cap moviment fort els últims dies<em>Mercat →</em></span>`}
 	</button>`;
 }
 
@@ -840,7 +842,7 @@ function compartitResum() {
 // les idees: el quadre per apuntar-ne una. Es desa al mòbil a l'instant (també sense connexió) i arriba sola a Reshi, que
 // la guarda i la posa a la safata del vault
 function votsPerPassar(ambEnllac = true) {
-	if (!estat.personal) return '';
+	if (!AMB_IDEES || !estat.personal) return '';
 	const cua = estat.notes.length;
 	return `<form class="passar" id="form-nota">
 		<p><b>${icona('idea', 15)} Apunta una idea.</b> Es queda guardada al mòbil encara que no tinguis connexió, i arriba sola a Reshi i al vault.</p>
@@ -1104,7 +1106,7 @@ function vistaMercat() {
 		return diaDe(d);
 	};
 	const moviments = perDia.size
-		? `<section class="m-forts"><span class="etiqueta">⚡ Moviments forts dels últims dies</span>${[...perDia.entries()]
+		? `<section class="m-forts-sec"><h2 class="s-titol">Moviments forts</h2><div class="m-forts">${[...perDia.entries()]
 				.slice(0, 3)
 				.map(([d, ms]) => {
 					// la notícia que ho explica: d'aquell dia o de l'endemà, de borsa si s'ha mogut la borsa (té preferència), de cripto si les cripto
@@ -1116,10 +1118,10 @@ function vistaMercat() {
 						.sort((a, b) => punts(b) - punts(a))[0];
 					return `<div class="m-moviment-dia"><b>${esc(dataCurta(d))}</b><span class="m-moviment-coses">${ms
 						.sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct))
-						.map((x) => `<span class="${x.pct < 0 ? 'baixa' : 'puja'}">${x.pct < 0 ? '↘' : '↗'} ${esc(x.nom)} ${pct(x.pct)}</span>`)
-						.join('')}</span>${n ? `<button type="button" class="m-perque" data-noticia-mercat="${n.id}">Per què? →</button>` : ''}</div>`;
+						.map((x) => `<span class="${x.pct < 0 ? 'baixa' : 'puja'}">${esc(x.nom)} <b>${pct(x.pct)}</b></span>`)
+						.join('')}</span>${n ? `<button type="button" class="m-perque" data-noticia-mercat="${n.id}">Per què?</button>` : ''}</div>`;
 				})
-				.join('')}</section>`
+				.join('')}</div></section>`
 		: '';
 	const comEsta = `${moviments}<div class="m-actius grans">${GRAFICS.flatMap((id) => m.actius.filter((a) => a.id === id))
 		.map(
@@ -1307,7 +1309,6 @@ function vistaVitrina() {
 			(p) => {
 				// el que té web obre la web directament; la nota del projecte (amb el codi) queda en un botó petit
 				const cos = `<span class="medalla">${icona(p.icona, 30)}</span>
-			<span class="placa">${esc(PLACA[p.estat] ?? p.estat)}</span>
 			<h2>${esc(p.titol)}</h2>
 			<p>${esc(p.resum)}</p>`;
 				return p.web
@@ -1365,7 +1366,7 @@ function vistaProjecte() {
 	<div class="fitxa-cos">
 		<header class="fitxa-cap">
 			<span class="medalla">${icona(v?.icona ?? 'espurna', 30)}</span>
-			<div><span class="placa">${esc(PLACA[p.estat] ?? p.estat)}</span><h1>${esc(p.titol)}</h1>${p.actualitzat ? `<small>Tocat el ${esc(p.actualitzat.split('-').reverse().join('/'))}</small>` : ''}</div>
+			<div><h1>${esc(p.titol)}</h1>${p.actualitzat ? `<small>Tocat el ${esc(p.actualitzat.split('-').reverse().join('/'))}</small>` : ''}</div>
 		</header>
 		<p class="fitxa-resum">${textNota(p.resum)}</p>
 		${v?.web ? `<a class="fitxa-web" href="${esc(v.web)}" target="_blank" rel="noopener">Obrir la web ${icona('fletxa', 14)}</a>` : ''}
@@ -1440,6 +1441,7 @@ function vistaLector() {
 function pintar() {
 	const app = document.getElementById('app');
 	if (!AMB_ACTIVITAT && (estat.vista === 'activitat' || estat.vista === 'iphone')) estat.vista = 'avui';
+	if (!AMB_IDEES && estat.vista === 'idees') estat.vista = 'avui';
 	if (estat.error && !estat.dades) {
 		app.innerHTML = `<main class="pantalla"><p class="buit">${esc(estat.error)}</p></main>`;
 		return;

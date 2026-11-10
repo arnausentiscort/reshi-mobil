@@ -1,0 +1,199 @@
+/* =====================================================================================================
+   El sistema de Reshi (10/11/2026). Un sol fitxer per a l'ordinador i el mòbil: els colors, la lletra, els espais, els
+   radis, les ombres i les peces comunes (.s-*). Les regles són a ESTIL.md. Si una pantalla necessita un valor que no
+   és aquí, primer es mira si de debò cal; no s'inventen mides ni colors nous a cada pantalla.
+   - L'ordinador el carrega des de interficie/src/main.tsx; el mòbil, des de mobil/index.html (abans d'estil.css).
+   - Mode clar: <html data-mode="clar">. Un sol tema: grisos nets i un daurat suau com a únic accent.
+   ===================================================================================================== */
+
+:root {
+	color-scheme: dark;
+
+	/* --- colors: fosc --- */
+	--fons: #0f0f10;
+	--panell: #19191b;
+	--panell-2: #141415;
+	--elevat: #232326;
+	--elevat-2: #2e2e32;
+	--text: #e9e9ec;
+	--text-2: #a1a1a8;
+	--text-3: #86868f;
+	--fort: #ffffff; /* títols i xifres */
+	--accent: #d6b575; /* l'únic accent: l'acció o el valor que importa */
+	--accent-viu: #e3c78f;
+	--sobre-accent: #1b1608;
+	--ok: #4cc38a; /* el que puja o va bé */
+	--dolent: #f08b82; /* el que baixa o va malament (text) */
+	--marca: #e5645a; /* el vermell de línies i punts */
+	--secundari: #c95a4d;
+	--a: 214, 181, 117; /* l'accent en "r, g, b", per a transparències */
+	--ok-rgb: 76, 195, 138;
+	--t: 255, 255, 255; /* el to dels neutres; al mode clar, negre */
+	--vora: rgba(var(--t), 0.07);
+	--vora-forta: rgba(var(--t), 0.12);
+
+	/* --- lletra: la del sistema (San Francisco a l'iPhone i al Mac, Segoe UI Variable a Windows) --- */
+	--lletra: -apple-system, BlinkMacSystemFont, 'Segoe UI Variable', 'Segoe UI', system-ui, Roboto, sans-serif;
+	--mono: 'JetBrains Mono', ui-monospace, 'SF Mono', 'Cascadia Mono', Consolas, monospace; /* només diners i taules */
+	/* cinc mides i prou */
+	--m-nota: 13px;
+	--m-cos: 15px;
+	--m-sub: 17px;
+	--m-titol: 24px;
+	--m-gran: 40px;
+
+	/* --- espais (passos de 4) --- */
+	--espai-1: 4px;
+	--espai-2: 8px;
+	--espai-3: 12px;
+	--espai-4: 16px;
+	--espai-5: 24px;
+	--espai-6: 32px;
+	--espai-7: 48px;
+	--espai-8: 64px;
+
+	/* --- radis: petit (botons, camps), mitjà (files, pastilles grans), gran (targetes i llistes) --- */
+	--r-xs: 8px;
+	--r-s: 10px;
+	--r-m: 14px;
+	--r-l: 20px;
+
+	/* --- ombres: neutres, amb desplaçament; mai de color --- */
+	--ombra-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 14px rgba(0, 0, 0, 0.22);
+	--ombra-2: 0 2px 6px rgba(0, 0, 0, 0.3), 0 18px 44px rgba(0, 0, 0, 0.4);
+
+	/* --- moviment: curt i amb sortida suau --- */
+	--molla: cubic-bezier(0.32, 0.72, 0, 1);
+	--rapid: 180ms;
+	--normal: 280ms;
+
+	/* els noms que fa servir el mòbil (són els mateixos colors) */
+	--or: var(--accent);
+	--or-rgb: var(--a);
+	--bo: var(--ok);
+	--sorra: var(--accent);
+	--triat: var(--accent-viu);
+}
+
+:root[data-mode='clar'] {
+	color-scheme: light;
+	--fons: #f5f5f7;
+	--panell: #ffffff;
+	--panell-2: #efeff2;
+	--elevat: #f1f1f3;
+	--elevat-2: #e5e5e9;
+	--text: #1d1d1f;
+	--text-2: #55555c;
+	--text-3: #6e6e76;
+	--fort: #0b0b0c;
+	--accent: #946c1e;
+	--accent-viu: #7f5b15;
+	--sobre-accent: #ffffff;
+	--ok: #1a7f4b;
+	--dolent: #c0352b;
+	--marca: #d6453b;
+	--secundari: #b9463a;
+	--a: 148, 108, 30;
+	--ok-rgb: 26, 127, 75;
+	--t: 0, 0, 0;
+	--vora: rgba(0, 0, 0, 0.08);
+	--vora-forta: rgba(0, 0, 0, 0.14);
+	--ombra-1: 0 1px 2px rgba(0, 0, 0, 0.06), 0 4px 14px rgba(0, 0, 0, 0.06);
+	--ombra-2: 0 2px 6px rgba(0, 0, 0, 0.08), 0 18px 44px rgba(0, 0, 0, 0.12);
+}
+
+/* el que el navegador pinta sol també és del sistema */
+::selection { background: rgba(var(--a), 0.3); }
+:root { caret-color: var(--accent); accent-color: var(--accent); }
+
+/* =====================================================================================================
+   Les peces. Cada pantalla es munta amb aquestes; no amb caixes fetes a mida.
+   ===================================================================================================== */
+
+/* --- la capçalera d'una pàgina: un títol gran i, si cal, una línia a sota. Res a sobre del títol. --- */
+.s-cap { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--espai-4) var(--espai-6); }
+.s-cap h1 { margin: 0; font-size: clamp(30px, 4.2vw, var(--m-gran)); font-weight: 700; line-height: 1.08; letter-spacing: -0.025em; color: var(--fort); text-wrap: balance; }
+.s-cap p { margin: var(--espai-2) 0 0; max-width: 62ch; font-size: var(--m-sub); line-height: 1.45; color: var(--text-3); }
+
+/* --- una secció: títol normal (no etiqueta) i el contingut --- */
+.s-seccio { display: flex; flex-direction: column; gap: var(--espai-4); }
+.s-seccio > h2 { display: flex; align-items: baseline; gap: var(--espai-2); margin: 0; font-size: var(--m-titol); font-weight: 700; letter-spacing: -0.02em; color: var(--fort); }
+.s-seccio > h2 small { font-size: var(--m-nota); font-weight: 500; letter-spacing: 0; color: var(--text-3); }
+
+/* --- la llista agrupada (com la Configuració de l'iPhone): files amb una línia fina entremig, un sol bloc --- */
+.s-llista { display: flex; flex-direction: column; overflow: hidden; border-radius: var(--r-l); background: var(--panell); box-shadow: inset 0 0 0 1px var(--vora); }
+.s-fila { display: flex; align-items: center; gap: var(--espai-4); width: 100%; min-height: 56px; padding: var(--espai-3) var(--espai-5) var(--espai-3) var(--espai-4); border: 0; border-radius: 0; text-align: left; font: inherit; color: var(--text); background: transparent; transition: background var(--rapid); }
+.s-fila + .s-fila { box-shadow: inset 0 1px 0 var(--vora); }
+button.s-fila, a.s-fila { cursor: pointer; text-decoration: none; }
+button.s-fila:hover, a.s-fila:hover { background: rgba(var(--t), 0.04); }
+button.s-fila:active, a.s-fila:active { background: rgba(var(--t), 0.07); }
+.s-fila-icona { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: var(--r-s); color: var(--text-2); background: rgba(var(--t), 0.06); }
+.s-fila-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.s-fila-text b { font-size: var(--m-cos); font-weight: 600; color: var(--fort); }
+.s-fila-text small { font-size: var(--m-nota); line-height: 1.4; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.s-fila-valor { flex: none; font-size: var(--m-sub); font-weight: 600; font-variant-numeric: tabular-nums; color: var(--fort); }
+.s-fila-valor.puja { color: var(--ok); }
+.s-fila-valor.baixa { color: var(--dolent); }
+.s-fila-nota { flex: none; font-size: var(--m-nota); color: var(--text-3); white-space: nowrap; }
+.s-fila-fletxa { flex: none; color: var(--text-3); opacity: 0.7; }
+
+/* --- la targeta: una superfície, sense res a dins que torni a ser una targeta --- */
+.s-targeta { display: flex; flex-direction: column; gap: var(--espai-3); padding: var(--espai-5); border-radius: var(--r-l); background: var(--panell); box-shadow: inset 0 0 0 1px var(--vora); }
+.s-targeta > h3 { margin: 0; font-size: var(--m-sub); font-weight: 600; color: var(--fort); }
+.s-targeta > p { margin: 0; font-size: var(--m-cos); line-height: 1.55; color: var(--text-2); }
+
+/* --- la xifra: què és (gris), el número gran i una sola línia d'explicació --- */
+.s-xifra { display: flex; flex-direction: column; gap: var(--espai-1); }
+.s-xifra > span { font-size: var(--m-nota); color: var(--text-3); }
+.s-xifra > b { font-size: var(--m-gran); font-weight: 700; line-height: 1.05; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; color: var(--fort); }
+.s-xifra > small { font-size: var(--m-nota); color: var(--text-3); }
+.s-xifra > small.puja { color: var(--ok); }
+.s-xifra > small.baixa { color: var(--dolent); }
+.s-xifres { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--espai-5); }
+
+/* --- botons: un de principal per pantalla com a molt --- */
+.s-boto { display: inline-flex; align-items: center; justify-content: center; gap: var(--espai-2); height: 40px; padding: 0 var(--espai-4); border: 0; border-radius: var(--r-s); font: inherit; font-size: var(--m-cos); font-weight: 600; cursor: pointer; color: var(--fort); background: rgba(var(--t), 0.08); transition: background var(--rapid), transform var(--rapid) var(--molla); }
+.s-boto:hover { background: rgba(var(--t), 0.12); }
+.s-boto:active { transform: scale(0.97); }
+.s-boto.principal { color: var(--sobre-accent); background: var(--accent); }
+.s-boto.principal:hover { background: var(--accent-viu); }
+.s-boto.pla { color: var(--accent); background: transparent; padding: 0 var(--espai-2); }
+.s-boto.pla:hover { background: rgba(var(--a), 0.1); }
+.s-boto:disabled { opacity: 0.45; cursor: default; }
+
+/* --- pastilles (filtres) i el selector de dues o tres opcions --- */
+.s-pastilles { display: flex; flex-wrap: wrap; gap: var(--espai-2); }
+.s-pastilla { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 var(--espai-3); border: 0; border-radius: 999px; font: inherit; font-size: var(--m-nota); font-weight: 600; cursor: pointer; color: var(--text-2); background: rgba(var(--t), 0.06); transition: background var(--rapid), color var(--rapid); }
+.s-pastilla:hover { background: rgba(var(--t), 0.1); }
+.s-pastilla.triada { color: var(--fons); background: var(--fort); }
+.s-seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: var(--r-s); background: rgba(var(--t), 0.07); }
+.s-seg button { height: 32px; padding: 0 var(--espai-4); border: 0; border-radius: var(--r-xs); font: inherit; font-size: var(--m-nota); font-weight: 600; cursor: pointer; color: var(--text-2); background: transparent; transition: background var(--rapid), color var(--rapid); }
+.s-seg button.triat { color: var(--fort); background: var(--panell); box-shadow: var(--ombra-1); }
+:root:not([data-mode='clar']) .s-seg button.triat { background: var(--elevat-2); }
+
+/* --- el camp de text --- */
+.s-camp { width: 100%; height: 44px; padding: 0 var(--espai-4); border: 0; border-radius: var(--r-s); font: inherit; font-size: var(--m-cos); color: var(--text); background: rgba(var(--t), 0.06); box-shadow: inset 0 0 0 1px transparent; transition: box-shadow var(--rapid), background var(--rapid); }
+.s-camp::placeholder { color: var(--text-3); }
+.s-camp:focus { outline: 0; background: var(--panell); box-shadow: inset 0 0 0 1.5px var(--accent); }
+
+/* --- el gràfic de línia: una línia neta, sense resplendor; verd si puja, vermell si baixa --- */
+.s-grafic { display: block; width: 100%; height: 160px; overflow: visible; }
+.s-grafic polyline { fill: none; stroke: var(--text-2); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.s-grafic polygon { fill: rgba(var(--t), 0.05); }
+.s-grafic.puja polyline { stroke: var(--ok); }
+.s-grafic.puja polygon { fill: rgba(var(--ok-rgb), 0.1); }
+.s-grafic.baixa polyline { stroke: var(--marca); }
+.s-grafic.baixa polygon { fill: color-mix(in srgb, var(--marca) 10%, transparent); }
+
+/* --- quan no hi ha res: una frase tranquil·la, no un quadre buit --- */
+.s-buit { margin: 0; padding: var(--espai-6) var(--espai-4); font-size: var(--m-cos); text-align: center; color: var(--text-3); }
+
+@media (max-width: 720px) {
+	.s-fila { padding-right: var(--espai-4); }
+	.s-targeta { padding: var(--espai-4); }
+	.s-boto { height: 44px; } /* zona de toc */
+	.s-xifra > b { font-size: 34px; }
+}
+@media (prefers-reduced-motion: reduce) {
+	.s-boto, .s-fila, .s-pastilla, .s-seg button, .s-camp { transition: none; }
+}
