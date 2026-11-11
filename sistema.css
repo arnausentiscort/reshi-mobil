@@ -17,7 +17,7 @@
 	--elevat-2: #2e2e32;
 	--text: #e9e9ec;
 	--text-2: #a1a1a8;
-	--text-3: #86868f;
+	--text-3: #8d8d96; /* 4,5:1 com a mínim fins i tot sobre --elevat */
 	--fort: #ffffff; /* títols i xifres */
 	--accent: #d6b575; /* l'únic accent: l'acció o el valor que importa */
 	--accent-viu: #e3c78f;
@@ -84,17 +84,17 @@
 	--elevat-2: #e5e5e9;
 	--text: #1d1d1f;
 	--text-2: #55555c;
-	--text-3: #6e6e76;
+	--text-3: #68686f;
 	--fort: #0b0b0c;
-	--accent: #946c1e;
+	--accent: #8a6419; /* un punt més fosc perquè el text daurat es llegeixi (4,5:1) sobre el fons gris */
 	--accent-viu: #7f5b15;
 	--sobre-accent: #ffffff;
-	--ok: #1a7f4b;
+	--ok: #177a47;
 	--dolent: #c0352b;
 	--marca: #d6453b;
 	--secundari: #b9463a;
-	--a: 148, 108, 30;
-	--ok-rgb: 26, 127, 75;
+	--a: 138, 100, 25;
+	--ok-rgb: 23, 122, 71;
 	--t: 0, 0, 0;
 	--vora: rgba(0, 0, 0, 0.08);
 	--vora-forta: rgba(0, 0, 0, 0.14);
@@ -127,6 +127,7 @@
 button.s-fila, a.s-fila { cursor: pointer; text-decoration: none; }
 button.s-fila:hover, a.s-fila:hover { background: rgba(var(--t), 0.04); }
 button.s-fila:active, a.s-fila:active { background: rgba(var(--t), 0.07); }
+button.s-fila:focus-visible, a.s-fila:focus-visible { outline-offset: -2px; } /* la llista talla el que surt: el marc del teclat, a dins */
 .s-fila-icona { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: var(--r-s); color: var(--text-2); background: rgba(var(--t), 0.06); }
 .s-fila-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .s-fila-text b { font-size: var(--m-cos); font-weight: 600; color: var(--fort); }

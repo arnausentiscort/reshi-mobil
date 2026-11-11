@@ -101,7 +101,6 @@ img { display: block; max-width: 100%; }
 /* la "rajola": totes iguals, com a Reshi (triada per l'Arnau, 26/10) */
 .medalla { width: 64px; height: 64px; display: grid; place-items: center; border-radius: var(--r-l); color: #f0cf8e; background: linear-gradient(180deg, rgba(var(--or-rgb), 0.22), rgba(var(--or-rgb), 0.04) 60%), #1c1a15; box-shadow: inset 0 1px 0 rgba(var(--t), 0.12), inset 0 0 0 1px rgba(var(--or-rgb), 0.3), 0 6px 18px rgba(0, 0, 0, 0.4); }
 .medalla .ic { stroke-width: 1.75; }
-.placa { padding: 3px 9px; border-radius: var(--r-xs); font-family: var(--mono); font-size: 9.5px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #1a1408; background: var(--or); }
 .trofeu h2 { margin: 0; font-size: 15px; font-weight: 700; line-height: 1.2; color: var(--fort); text-wrap: balance; }
 .trofeu p { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--text-2); }
 .trofeu a { margin-top: auto; display: inline-flex; align-items: center; gap: 5px; padding: 7px 14px; border-radius: var(--r-s); font-size: 12.5px; font-weight: 700; color: var(--or); text-decoration: none; background: rgba(var(--or-rgb), 0.1); }
@@ -551,27 +550,12 @@ img { display: block; max-width: 100%; }
 .m-marca.dolent { background: #e5534b; }
 .m-marca:active { transform: scale(1.4); }
 @media (hover: hover) { .m-marca:hover { transform: scale(1.5); box-shadow: 0 0 0 4px rgba(var(--or-rgb), 0.25), 0 0 14px rgba(var(--or-rgb), 0.6); } }
-.m-toca-graella { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; align-items: start; }
-.m-toca-grup { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: var(--r-m); background: var(--panell); box-shadow: inset 0 0 0 1px var(--vora); }
-.m-toca-grup.meu { box-shadow: inset 0 0 0 1px rgba(var(--or-rgb), 0.4); }
-.m-toca-grup header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.m-toca-grup header b { font-size: 17px; font-weight: 700; }
-.m-balanc { display: flex; flex-direction: column; gap: 5px; }
 .m-balanc-barra { display: flex; gap: 2px; height: 6px; border-radius: 3px; overflow: hidden; }
 .m-balanc-barra i { transform-origin: left center; animation: creix 1s cubic-bezier(0.32, 0.72, 0, 1) both; }
 .m-balanc-barra .bo { background: #4ade80; }
 .m-balanc-barra .dolent { background: #e5534b; }
 .m-balanc-barra .depen { background: #6b6a66; }
-.m-balanc small { color: var(--text-2); font-size: 12px; }
-.m-toca-grup ul { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; }
-.m-toca-fila { display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 8px; border: 0; border-radius: var(--r-s); background: transparent; color: inherit; font: inherit; text-align: left; transition: background 0.2s, transform 0.3s; }
-.m-toca-fila:active { transform: scale(0.98); background: rgba(var(--or-rgb), 0.07); }
-@media (hover: hover) { .m-toca-fila:hover { background: rgba(var(--or-rgb), 0.07); } }
-.m-toca-fila.vista b { color: var(--text-2); }
-.m-toca-fila > span:last-child { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.m-toca-fila b { font-size: 14px; line-height: 1.3; }
-.m-toca-fila small { color: var(--text-2); font-size: 12.5px; line-height: 1.4; }
-.m-toca-fila .pastilla-toca { flex: none; margin-top: 1px; }
+
 .m-que { font-style: normal; font-weight: 700; }
 .m-que.bo { color: var(--bo); }
 .m-que.dolent { color: #f0716a; }
@@ -647,10 +631,6 @@ a.trofeu-obrir { text-decoration: none; }
 .act-anell { flex: none; width: 64px; height: 64px; transform: rotate(-90deg); }
 .act-anell circle { fill: none; stroke: var(--elevat); stroke-width: 7; }
 .act-anell .ple { stroke: var(--or); stroke-linecap: round; }
-.act-xifra { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.act-xifra small { font-size: 12px; color: var(--text-3); }
-.act-xifra small:first-child { font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--or); }
-.act-xifra b { font-family: var(--mono); font-size: 28px; font-weight: 700; line-height: 1.1; color: var(--fort); }
 .act-gimnas { flex: none; display: flex; flex-direction: column; align-items: center; gap: 4px; width: 78px; padding: 10px 6px; border: 0; border-radius: var(--r-m); font-size: 11.5px; font-weight: 700; color: var(--text-2); background: var(--elevat); box-shadow: inset 0 0 0 1px var(--vora-forta); }
 .act-gimnas[aria-pressed='true'] { color: #1a1408; background: var(--or); box-shadow: none; }
 .act-setmana { list-style: none; display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin: 0; padding: 0; }
@@ -766,28 +746,12 @@ a.trofeu-obrir { text-decoration: none; }
 .pestanyes button { flex-basis: 72px; }
 
 /* ---- La llista de coses ---- */
-.ll-form { display: flex; flex-direction: column; gap: 8px; }
-.ll-fila { display: flex; gap: 8px; }
-.ll-form input, .ll-form select { min-width: 0; height: 44px; padding: 0 12px; border: 0; border-radius: var(--r-s); font: inherit; font-size: 16px; color: var(--text); background: var(--fons); box-shadow: inset 0 0 0 1px var(--vora-forta); outline: 0; }
-.ll-form input:focus, .ll-form select:focus { box-shadow: inset 0 0 0 1.5px var(--or); }
-.ll-fila input { flex: 1; font-weight: 600; }
-.ll-fila button { flex: none; height: 44px; padding: 0 18px; border: 0; border-radius: var(--r-s); font-weight: 700; color: #1a1408; background: var(--or); }
-.ll-form summary { font-size: 13px; font-weight: 600; color: var(--text-3); cursor: pointer; }
-.ll-mes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
-.ll-mes input[name='enllac'], .ll-mes .ll-regal, .ll-mes .ll-cancel { grid-column: 1 / -1; }
-.ll-regal { display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 12px; border-radius: var(--r-s); font-size: 14px; font-weight: 600; color: var(--text-2); background: var(--fons); box-shadow: inset 0 0 0 1px var(--vora-forta); }
-.ll-regal input { width: 18px; height: 18px; box-shadow: none; accent-color: var(--or); }
-.ll-regal:has(input:checked) { color: var(--or); box-shadow: inset 0 0 0 1px rgba(var(--or-rgb), 0.45); }
-.ll-cancel { height: 40px; border: 0; border-radius: var(--r-s); font-weight: 700; color: var(--text-2); background: var(--elevat); }
 .ll-xifres { display: flex; justify-content: space-between; margin: 0; font-size: 13px; color: var(--text-3); }
 .ll-xifres b { font-family: var(--mono); font-weight: 700; color: var(--fort); }
 .ll-llista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .ll-cosa { display: flex; align-items: center; gap: 10px; padding: 10px 10px 10px 12px; border-radius: var(--r-m); background: var(--panell); box-shadow: inset 0 0 0 1px var(--vora); }
-.ll-cosa.editant { display: block; padding: 12px; box-shadow: inset 0 0 0 1px rgba(var(--or-rgb), 0.4); }
 .ll-cosa.comprada { opacity: 0.6; }
 .ll-cosa.comprada b { text-decoration: line-through; }
-.ll-check { flex: none; width: 28px; height: 28px; display: grid; place-items: center; padding: 0; border: 0; border-radius: var(--r-xs); color: #1a1408; background: transparent; box-shadow: inset 0 0 0 2px rgba(var(--t), 0.3); }
-.ll-check[aria-pressed='true'] { background: var(--or); box-shadow: none; }
 .ll-text { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 0; border: 0; text-align: left; background: none; }
 .ll-text b { max-width: 100%; font-size: 15px; font-weight: 700; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ll-text small { display: flex; flex-wrap: wrap; gap: 5px; }
@@ -795,7 +759,6 @@ a.trofeu-obrir { text-decoration: none; }
 .ll-xip.regal { color: var(--or); background: rgba(var(--or-rgb), 0.12); }
 .ll-xip.meu { color: var(--bo); background: rgba(74, 222, 128, 0.1); }
 .ll-preu { flex: none; font-family: var(--mono); font-size: 14px; font-weight: 700; color: var(--fort); }
-.ll-icona { flex: none; width: 34px; height: 34px; display: grid; place-items: center; padding: 0; border: 0; border-radius: var(--r-s); color: var(--text-3); background: none; }
 .ll-comprades summary { display: flex; align-items: center; gap: 6px; padding: 4px 0 10px; font-size: 13px; font-weight: 600; color: var(--text-3); cursor: pointer; }
 /* la carta de regals: un full net per fer-ne captura */
 .ll-carta { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding: 20px; background: #0d0b08; }
@@ -917,9 +880,6 @@ a.trofeu-obrir { text-decoration: none; }
 .m-actiu.gran .m-grafic { margin: 2px 0 18px; }
 .m-actiu.gran .m-linia { height: 150px; }
 .m-actiu.gran .m-linia polyline { stroke-width: 2.2; }
-.m-eix-max, .m-eix-min { position: absolute; right: 0; padding: 1px 6px; border-radius: var(--r-xs); font-family: var(--mono); font-size: 10.5px; color: var(--text-3); background: color-mix(in srgb, var(--panell) 80%, transparent); pointer-events: none; }
-.m-eix-max { top: 0; }
-.m-eix-min { bottom: 0; }
 .m-eix-dates { position: absolute; left: 0; right: 0; bottom: -18px; display: flex; justify-content: space-between; font-family: var(--mono); font-size: 10.5px; color: var(--text-3); pointer-events: none; }
 @media (min-width: 760px) {
 	.m-actius.grans { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1092,3 +1052,8 @@ h2.etiqueta { font-size: 20px; font-weight: 700; letter-spacing: -0.015em; color
 .ll-xip.regal { color: var(--or); font-weight: 600; background: none; }
 .ll-preu { font-family: var(--lletra); font-size: var(--m-cos); font-weight: 600; font-variant-numeric: tabular-nums; }
 .ll-xifres b { font-family: var(--lletra); }
+
+/* Fase 4 (repàs): els botons petits es veuen igual, però la zona de toc arriba a 44 px amb una capa invisible al voltant.
+   (.rodo dins de la carta i el botó de tancar del lector ja són absoluts: la seva regla, més concreta, mana.) */
+.rodo, .rodo-petit, .mode, .estat-noves button, .m-perque { position: relative; }
+.rodo::after, .rodo-petit::after, .mode::after, .estat-noves button::after, .m-perque::after { content: ''; position: absolute; inset: 50% auto auto 50%; width: max(100%, 44px); height: max(100%, 44px); transform: translate(-50%, -50%); }
