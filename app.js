@@ -110,6 +110,7 @@ const aplicar = (obert) => {
 	estat.projectes = obert?.projectes ?? null; // la nota de cada projecte de la vitrina (què ha fet, què falta)
 	estat.diners = obert?.diners ?? null; // els seus diners de debò
 	estat.despeses = obert?.despeses ?? null; // on se'n van els diners cada mes (despeses.py)
+	estat.calendari = obert?.calendari ?? null; // els pròxims dies del Google Calendar (només lectura)
 	for (const id of obert?.vistes ?? []) estat.vistes.add(id); // les que ja va llegir a l'ordinador
 	// els vots que ja té Reshi: es marquen aquí també (i una votada és una llegida)
 	estat.votsReshi = obert?.vots ?? {};
@@ -591,6 +592,36 @@ function fitxaMercat(msci) {
 	</button>`;
 }
 
+// el que val la pena saber ara: una frase, la notícia que més importa i el que ve (calendari, o l'agenda de les notícies)
+const quanEs = (iso) => {
+	const d = iso.slice(0, 10);
+	const f = Math.round((dia(d).getTime() - dia(avui()).getTime()) / 864e5);
+	return f === 0 ? 'Avui' : f === 1 ? 'Demà' : dataCurta(d);
+};
+function avuiDeDebo(noves, msci) {
+	const e = estat.dades.edicio;
+	const noticia = [...meves()].sort(ordre)[0] ?? null;
+	const cal = estat.calendari?.disponible ? estat.calendari.esdeveniments : [];
+	const ara = new Date();
+	const passat = (x) => (x.tot_el_dia ? dia(x.fi.slice(0, 10)) <= dia(avui()) : new Date(x.fi) < ara);
+	let properes = cal.filter((x) => !passat(x)).slice(0, 4).map((x) => ({data: x.inici.slice(0, 10), quan: quanEs(x.inici), text: x.titol, hora: x.tot_el_dia ? '' : x.inici.slice(11, 16)}));
+	if (!properes.length) properes = e.agenda.filter((a) => a.data >= avui()).slice(0, 4).map((a) => ({data: a.data, quan: quanEs(a.data), text: a.text, hora: ''}));
+	const parts = [];
+	if (msci) parts.push(`El teu MSCI World ${msci.canvis.setmana >= 0 ? 'puja' : 'baixa'} un ${Math.abs(Math.round(msci.canvis.setmana * 10) / 10).toLocaleString('ca-ES')} % aquesta setmana.`);
+	const avuiEv = properes.find((x) => x.data === avui());
+	const demaEv = properes.find((x) => x.quan === 'Demà');
+	if (avuiEv) parts.push(`Avui: ${avuiEv.text}.`);
+	else if (demaEv) parts.push(`Demà: ${demaEv.text}.`);
+	if (noves) parts.push(`${noves === 1 ? 'Hi ha 1 notícia nova' : `Hi ha ${noves} notícies noves`}.`);
+	const compra = dadesCoses().coses.filter((c) => c.estat !== 'comprada').length;
+	if (compra) parts.push(`Et falta comprar ${compra} ${compra === 1 ? 'cosa' : 'coses'}.`);
+	return {resum: parts.join(' '), noticia, properes};
+}
+const targetaNoticia = (t) => `<button type="button" class="m-wg m-wg-noticia" data-vista="noticies">
+	<span class="m-wg-cap">La notícia que més importa</span>
+	<span class="m-wg-cos"><span class="m-wg-text"><b>${esc(t.titol)}</b><small>${esc(t.frase)}</small></span>${t.imatge ? `<img src="${esc(t.imatge)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}</span>
+</button>`;
+
 function vistaAvui() {
 	const h = new Date().getHours();
 	const salutacio = h < 6 ? 'Bona nit' : h < 14 ? 'Bon dia' : h < 21 ? 'Bona tarda' : 'Bona nit';
@@ -604,11 +635,13 @@ function vistaAvui() {
 	const gimnasos = setmanaDe(new Date()).filter((d) => a.dies[d]?.gimnas).length;
 	const n = noves();
 	const msci = estat.dades.mercat?.actius?.find((x) => x.id === 'msci');
-	return `<header class="cap"><span class="sobre">${esc(dataLlarga(avui()))}</span><h1>${salutacio}, Arnau</h1>${frase ? `<p>${esc(frase[0].toUpperCase() + frase.slice(1))}.</p>` : ''}</header>
+	const { resum, noticia, properes } = avuiDeDebo(n, msci);
+	return `<header class="cap"><span class="sobre">${esc(dataLlarga(avui()))}</span><h1>${salutacio}, Arnau</h1>${frase ? `<p>${esc(frase[0].toUpperCase() + frase.slice(1))}.</p>` : resum ? `<p>${esc(resum)}</p>` : ''}</header>
 	${!AMB_ACTIVITAT ? '' : `<section class="activitat">${activitatGran(a)}${barresSetmana(a)}
 		${AMB_GIMNAS ? `<p class="act-peu"><b>${gimnasos} de ${a.objectius.gimnas}</b> dies de gimnàs aquesta setmana</p>` : ''}
 		<button type="button" class="act-mes-boto" data-vista="activitat">Tota l’activitat ${icona('endavant', 16)}</button>
 	</section>`}
+	${noticia ? targetaNoticia(noticia) : ''}
 	<div class="resum-fitxes">
 		${fitxaDespeses()}
 		<button type="button" data-vista="noticies">${icona('noticies', 20)}<b>${n ? `${n} ${n === 1 ? 'nova' : 'noves'}` : 'Al dia'}</b><small>Notícies</small></button>
@@ -616,6 +649,11 @@ function vistaAvui() {
 		<button type="button" data-vista="llista">${icona('llista', 20)}<b>${dadesCoses().coses.filter((c) => c.estat !== 'comprada').length}</b><small>Coses per comprar</small></button>
 		<button type="button" data-vista="vitrina">${icona('vitrina', 20)}<b>Vitrina</b><small>El que has fet</small></button>
 	</div>
+	${properes.length ? `<section class="m-wg"><span class="m-wg-cap">Properament</span><ul class="m-queve">${properes.map((e) => `<li><span class="m-quan">${esc(e.quan)}</span><span class="m-que">${esc(e.text)}</span>${e.hora ? `<small>${esc(e.hora)}</small>` : ''}</li>`).join('')}</ul></section>` : ''}
+	<section class="m-webs"><span class="m-wg-cap">Les teves webs</span>
+		<a href="https://arnausentiscort.github.io/llar/" target="_blank" rel="noopener">Llar<small>La llista, el menú i el calendari de casa</small>${icona('fletxa', 15)}</a>
+		<a href="https://arnausentiscort.github.io/boletus/" target="_blank" rel="noopener">Boletus<small>Quan anar a buscar bolets</small>${icona('fletxa', 15)}</a>
+	</section>
 	${votsPerPassar()}`;
 }
 

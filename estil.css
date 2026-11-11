@@ -1057,3 +1057,24 @@ h2.etiqueta { font-size: 20px; font-weight: 700; letter-spacing: -0.015em; color
    (.rodo dins de la carta i el botó de tancar del lector ja són absoluts: la seva regla, més concreta, mana.) */
 .rodo, .rodo-petit, .mode, .estat-noves button, .m-perque { position: relative; }
 .rodo::after, .rodo-petit::after, .mode::after, .estat-noves button::after, .m-perque::after { content: ''; position: absolute; inset: 50% auto auto 50%; width: max(100%, 44px); height: max(100%, 44px); transform: translate(-50%, -50%); }
+/* els filtres de la tira que llisca: 40 px d'alt (zona de toc còmoda; la capa invisible no hi cap en una tira) */
+.filtres button { height: 40px; }
+
+/* Avui amb informació de debò: la notícia que més importa, el que ve i els enllaços a les altres webs */
+.m-wg { display: flex; flex-direction: column; gap: var(--espai-3); width: 100%; padding: var(--espai-4); border: 0; border-radius: var(--r-l); text-align: left; font: inherit; color: var(--text); background: var(--panell); box-shadow: inset 0 0 0 1px var(--vora); }
+.m-wg-cap { font-size: var(--m-nota); color: var(--text-3); }
+.m-wg-cos { display: flex; gap: var(--espai-3); align-items: flex-start; }
+.m-wg-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--espai-2); }
+.m-wg-text b { font-size: var(--m-sub); font-weight: 600; line-height: 1.3; letter-spacing: -0.01em; color: var(--fort); }
+.m-wg-text small { font-size: var(--m-nota); line-height: 1.5; color: var(--text-2); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.m-wg-cos img { flex: none; width: 76px; height: 76px; border-radius: var(--r-m); object-fit: cover; background: rgba(var(--t), 0.06); }
+.m-queve { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--espai-3); }
+.m-queve li { display: flex; align-items: baseline; gap: var(--espai-3); }
+.m-quan { flex: none; width: 66px; font-size: var(--m-nota); color: var(--text-3); }
+.m-que { flex: 1; min-width: 0; font-size: var(--m-cos); font-weight: 500; color: var(--fort); }
+.m-queve small { flex: none; font-size: var(--m-nota); color: var(--text-3); }
+.m-webs { display: flex; flex-direction: column; overflow: hidden; border-radius: var(--r-l); background: var(--panell); box-shadow: inset 0 0 0 1px var(--vora); }
+.m-webs .m-wg-cap { padding: var(--espai-4) var(--espai-4) var(--espai-2); }
+.m-webs a { display: grid; grid-template-columns: 1fr auto; column-gap: var(--espai-3); align-items: center; min-height: 56px; padding: var(--espai-3) var(--espai-4); text-decoration: none; color: var(--fort); font-size: var(--m-cos); font-weight: 600; box-shadow: inset 0 1px 0 var(--vora); }
+.m-webs a small { grid-column: 1; font-size: var(--m-nota); font-weight: 400; color: var(--text-3); }
+.m-webs a .ic { grid-column: 2; grid-row: 1 / span 2; color: var(--text-3); }
