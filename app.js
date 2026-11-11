@@ -652,6 +652,7 @@ function vistaAvui() {
 	${properes.length ? `<section class="m-wg"><span class="m-wg-cap">Properament</span><ul class="m-queve">${properes.map((e) => `<li><span class="m-quan">${esc(e.quan)}</span><span class="m-que">${esc(e.text)}</span>${e.hora ? `<small>${esc(e.hora)}</small>` : ''}</li>`).join('')}</ul></section>` : ''}
 	<section class="m-webs"><span class="m-wg-cap">Les teves webs</span>
 		<a href="https://arnausentiscort.github.io/llar/" target="_blank" rel="noopener">Llar<small>La llista, el menú i el calendari de casa</small>${icona('fletxa', 15)}</a>
+		<a href="https://arnausentiscort.github.io/real-tiesada/" target="_blank" rel="noopener">Real Tiesada<small>Estadístiques i anàlisi de l'equip</small>${icona('fletxa', 15)}</a>
 		<a href="https://arnausentiscort.github.io/boletus/" target="_blank" rel="noopener">Boletus<small>Quan anar a buscar bolets</small>${icona('fletxa', 15)}</a>
 	</section>
 	${votsPerPassar()}`;
