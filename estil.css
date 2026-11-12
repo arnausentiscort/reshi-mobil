@@ -1078,3 +1078,19 @@ h2.etiqueta { font-size: 20px; font-weight: 700; letter-spacing: -0.015em; color
 .m-webs a { display: grid; grid-template-columns: 1fr auto; column-gap: var(--espai-3); align-items: center; min-height: 56px; padding: var(--espai-3) var(--espai-4); text-decoration: none; color: var(--fort); font-size: var(--m-cos); font-weight: 600; box-shadow: inset 0 1px 0 var(--vora); }
 .m-webs a small { grid-column: 1; font-size: var(--m-nota); font-weight: 400; color: var(--text-3); }
 .m-webs a .ic { grid-column: 2; grid-row: 1 / span 2; color: var(--text-3); }
+
+/* Mercat: què fan els grans */
+.m-grans-inv { display: flex; flex-direction: column; gap: 2px; padding: 12px 0; border-top: 1px solid var(--vora); }
+.m-grans-inv > small, .m-grans-cong small { font-size: 12px; color: var(--text-3); }
+.m-grans-inv ul, .m-grans-cong, .m-grans-not { list-style: none; margin: 6px 0 0; padding: 0; }
+.m-grans-inv li { display: flex; align-items: baseline; gap: 8px; padding: 4px 0; font-size: 14px; }
+.m-grans-inv li > span { min-width: 104px; font-size: 12.5px; font-weight: 600; }
+.m-grans-inv li small { margin-left: auto; color: var(--text-3); }
+.m-grans .puja { color: var(--ok); }
+.m-grans .baixa { color: var(--dolent); }
+.m-grans-sub { margin: 14px 0 0; font-size: 16px; }
+.m-grans-cong a, .m-grans-not a { display: flex; align-items: baseline; gap: 10px; min-height: 44px; padding: 9px 0; border-top: 1px solid var(--vora); color: var(--text); text-decoration: none; font-size: 14px; }
+.m-grans-cong a > span:first-child { flex: none; width: 52px; font-size: 12.5px; font-weight: 600; }
+.m-grans-cong b { flex: none; width: 52px; }
+.m-grans-cong a > span:last-child { display: flex; flex-direction: column; }
+.m-grans-not b { flex: none; font-size: 12px; color: var(--accent); }

@@ -15,6 +15,7 @@ const TEMES = {
 	cripto: {nom: 'Cripto', icona: 'cripto'},
 	conflictes: {nom: 'Món', icona: 'conflictes'},
 	tecnologia: {nom: 'Tecnologia', icona: 'tecnologia'},
+	ia: {nom: 'IA i coses boges', icona: 'tecnologia'},
 	gadgets: {nom: 'Gadgets', icona: 'mobil'},
 	jocs: {nom: 'Jocs', icona: 'jocs'},
 	ofertes: {nom: 'Ofertes', icona: 'ofertes'},
@@ -22,6 +23,7 @@ const TEMES = {
 };
 const FILTRES = [
 	{id: 'totes', nom: 'Totes', temes: null},
+	{id: 'ia', nom: 'IA', temes: ['ia']},
 	{id: 'ciencia', nom: 'Ciència i espai', temes: ['ciencia']},
 	{id: 'crear', nom: 'Per crear', temes: ['crear', 'eina']},
 	{id: 'reus', nom: 'Reus', temes: ['reus']},
@@ -1326,12 +1328,36 @@ function vistaMercat() {
 	</section>`
 		: '';
 
+	// què fan els grans: inversors (13F), congressistes dels EUA i notícies
+	const g = estat.dades.grans;
+	const EST = {NEW: 'Hi entra', 'SOLD OUT': 'Ho ven tot', ADDED: 'En compra més', TRIMMED: 'En ven una part'};
+	const cong = [...(g?.congres ?? [])].sort((a, b) => (b.amount_high ?? 0) - (a.amount_high ?? 0)).slice(0, 6);
+	const grans = g
+		? `<section class="m-bloc m-grans">
+		<h2 class="m-titol">Què fan els grans</h2>
+		${(g.inversors ?? [])
+			.map((i) => `<div class="m-grans-inv"><b>${esc(i.nom)}</b><small>${esc(i.fons)}</small><ul>${i.moviments
+				.slice(0, 4)
+				.map((m) => `<li><span class="${m.estat === 'NEW' || m.estat === 'ADDED' ? 'puja' : 'baixa'}">${EST[m.estat] ?? ''}</span><b>${esc(m.ticker ?? m.empresa)}</b><small>${m.pes ? `${m.pes} %` : ''}</small></li>`)
+				.join('')}</ul></div>`)
+			.join('')}
+		${cong.length ? `<h3 class="m-grans-sub">Els congressistes dels EUA</h3><ul class="m-grans-cong">${cong
+			.map((c) => `<li><a href="${esc(c.url)}" target="_blank" rel="noopener"><span class="${c.type === 'P' ? 'puja' : 'baixa'}">${({purchase: 'Compra', sale: 'Venda', 'partial sale': 'Ven part', exchange: 'Canvi'})[c.type_name] ?? esc(c.type_name)}</span><b>${esc(c.ticker)}</b><span>${esc(c.qui)}<small>${esc(c.amount)}</small></span></a></li>`)
+			.join('')}</ul>` : ''}
+		${g.noticies?.length ? `<h3 class="m-grans-sub">Què se’n diu</h3><ul class="m-grans-not">${g.noticies
+			.slice(0, 4)
+			.map((n) => `<li><a href="${esc(n.link)}" target="_blank" rel="noopener"><b>${esc(n.ticker)}</b> ${esc(n.title)}</a></li>`)
+			.join('')}</ul>` : ''}
+		<p class="m-peu">Dades públiques de la SEC i del Congrés dels EUA. Van amb retard: és saber què fan, no una ordre de compra.</p>
+	</section>`
+		: '';
+
 	return `<header class="cap">
 		<span class="sobre">Mercat${s?.data ? ` · setmana del ${dataBarra(s.data)}` : ''}</span>
 		<h1>Com està el mercat</h1>
 	</header>
-	${comEsta}${dinersMeus()}${despesesMeves()}${perQue}${laLlibreta()}${dinsMsci(estat.dades.msci, m.actius.find((x) => x.id === 'msci')?.canvis.setmana)}${cartera}${apostes}${futur}
-	<p class="m-peu">L’anàlisi es renova cada diumenge. Reshi analitza i explica: no és un assessor financer.</p>`;
+	${comEsta}${dinersMeus()}${despesesMeves()}${perQue}${laLlibreta()}${dinsMsci(estat.dades.msci, m.actius.find((x) => x.id === 'msci')?.canvis.setmana)}${cartera}${apostes}${futur}${grans}
+	<p class="m-peu">L’anàlisi es posa al dia cada dia feiner. Reshi analitza i explica: no és un assessor financer.</p>`;
 }
 
 function vistaVitrina() {
