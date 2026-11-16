@@ -193,9 +193,9 @@ const FLETXA = {bo: '↗', dolent: '↘', depen: '⇄'};
 const pastilla = (x, {petit = false, senseNom = false} = {}) =>
 	`<span class="pastilla-toca ${x.efecte}"><i>${FLETXA[x.efecte]}</i>${senseNom ? '' : `<b>${esc(NOMS_TOCA[x.actiu])}</b>`}${petit ? '' : `<span>${esc(x.que)}</span>`}</span>`;
 const toques = (t) => (t.toca?.length ? `<span class="toques">${t.toca.map((x) => pastilla(x, {petit: true})).join('')}</span>` : '');
-const etiqueta = (tema, nova, actualitzada) =>
+const etiqueta = (tema, nova, actualitzada, vista = false) =>
 	`<span class="etiqueta" data-tema="${tema}">${icona(TEMES[tema].icona, 12)} ${TEMES[tema].nom}${
-		actualitzada ? `<em class="nou actualitzada">Actualitzada · ${esc(dataCurta(actualitzada))}</em>` : nova ? `<em class="nou">Nou · ${esc(dataCurta(nova))}</em>` : ''
+		vista ? (actualitzada || nova ? `<em class="nou vist">${esc(dataCurta(actualitzada || nova))}</em>` : '') : actualitzada ? `<em class="nou actualitzada">Actualitzada · ${esc(dataCurta(actualitzada))}</em>` : nova ? `<em class="nou">Nou · ${esc(dataCurta(nova))}</em>` : ''
 	}</span>`;
 // el que es desa com a llegit: l'id, o l'id i la data de l'última actualització (així una actualitzada torna a ser nova)
 const clau = (t) => t.clau ?? t.id;
@@ -228,7 +228,7 @@ function vistaNoticies() {
 	const n = noves();
 	const agenda = e.agenda.filter((a) => a.data >= avui).slice(0, 5);
 	const fila = (t, i) => `<li><button type="button" class="fila ${estat.vots[t.id] === -1 ? 'sobra' : ''} ${estat.vistes.has(clau(t)) ? 'vista' : ''}" data-obrir="${i}">
-		<span class="fila-text">${etiqueta(t.tema, t.nova, t.actualitzada)}<b>${esc(t.titol)}</b>${abans(t)}${xifra(t)}${toques(t)}</span>
+		<span class="fila-text">${etiqueta(t.tema, t.nova, t.actualitzada, estat.vistes.has(clau(t)))}<b>${esc(t.titol)}</b>${abans(t)}${xifra(t)}${toques(t)}</span>
 		${foto(t, 'fila-foto')}
 	</button></li>`;
 	return `
@@ -261,8 +261,8 @@ function vistaNoticies() {
 	<ul class="llista">${resta.map((t, i) => fila(t, i + 1)).join('')}</ul>
 	${
 		llegides.length
-			? `<h2 class="etiqueta separador">${icona('fet', 12)} Ja llegides</h2>
-	<ul class="llista">${llegides.map((t, i) => fila(t, pendents.length + i)).join('')}</ul>`
+			? `${pendents.length ? `<h2 class="etiqueta separador">${icona('fet', 12)} Ja llegides</h2>` : ''}
+	<ul class="llista ${pendents.length ? '' : 'tot-llegit'}">${llegides.map((t, i) => fila(t, pendents.length + i)).join('')}</ul>`
 			: ''
 	}
 	${
@@ -586,10 +586,10 @@ function fitxaMercat(msci) {
 	if (!msci) return `<button type="button" class="gran" data-vista="mercat">${icona('mercat', 20)}<b>Mercat</b><small>Com està la borsa</small></button>`;
 	const fort = (estat.dades.mercat?.moviments ?? []).filter((x) => !FORA_DE_L_AVIS.includes(x.id)).sort((a, b) => b.data.localeCompare(a.data) || Math.abs(b.pct) - Math.abs(a.pct))[0];
 	const dia = msci.canvis.dia;
-	return `<button type="button" class="gran avui-mercat ${msci.canvis.mes >= 0 ? 'puja' : 'baixa'}" data-vista="mercat">
+	return `<button type="button" class="gran avui-mercat ${msci.canvis.setmana >= 0 ? 'puja' : 'baixa'}" data-vista="mercat">
 		<span class="avui-mercat-cap"><span class="etiqueta">${icona('mercat', 12)} El teu MSCI World</span><span class="avui-mercat-mes ${msci.canvis.setmana >= 0 ? 'puja' : 'baixa'}">${msci.canvis.setmana >= 0 ? '↗' : '↘'} ${pct(msci.canvis.setmana)} la setmana</span></span>
 		<span class="avui-mercat-cos"><strong>${preu(msci)}</strong>${dia !== undefined && msci.dia_data ? `<span class="avui-mercat-dia ${dia < 0 ? 'baixa' : 'puja'}">${esc(dataCurta(msci.dia_data))} ${pct(dia)}</span>` : ''}</span>
-		${linia(msci.serie, msci.canvis.mes >= 0)}
+		${linia(msci.serie, msci.canvis.setmana >= 0)}
 		${fort ? `<span class="avui-mercat-fort">${esc(dataCurta(fort.data))}: ${esc(fort.nom)} ${pct(fort.pct)}${fort.pct < 0 ? '' : ''}<em>Mercat →</em></span>` : `<span class="avui-mercat-fort calma">Cap moviment fort els últims dies<em>Mercat →</em></span>`}
 	</button>`;
 }
@@ -606,7 +606,7 @@ function avuiDeDebo(noves, msci) {
 	const cal = estat.calendari?.disponible ? estat.calendari.esdeveniments : [];
 	const ara = new Date();
 	const passat = (x) => (x.tot_el_dia ? dia(x.fi.slice(0, 10)) <= dia(avui()) : new Date(x.fi) < ara);
-	let properes = cal.filter((x) => !passat(x)).slice(0, 4).map((x) => ({data: x.inici.slice(0, 10), quan: quanEs(x.inici), text: x.titol, hora: x.tot_el_dia ? '' : x.inici.slice(11, 16)}));
+	let properes = cal.filter((x) => !passat(x)).slice(0, 6).map((x) => ({data: x.inici.slice(0, 10), quan: quanEs(x.inici), text: x.titol, hora: x.tot_el_dia ? '' : x.inici.slice(11, 16)}));
 	if (!properes.length) properes = e.agenda.filter((a) => a.data >= avui()).slice(0, 4).map((a) => ({data: a.data, quan: quanEs(a.data), text: a.text, hora: ''}));
 	const parts = [];
 	if (msci) parts.push(`El teu MSCI World ${msci.canvis.setmana >= 0 ? 'puja' : 'baixa'} un ${Math.abs(Math.round(msci.canvis.setmana * 10) / 10).toLocaleString('ca-ES')} % aquesta setmana.`);
@@ -643,6 +643,7 @@ function vistaAvui() {
 		${AMB_GIMNAS ? `<p class="act-peu"><b>${gimnasos} de ${a.objectius.gimnas}</b> dies de gimnàs aquesta setmana</p>` : ''}
 		<button type="button" class="act-mes-boto" data-vista="activitat">Tota l’activitat ${icona('endavant', 16)}</button>
 	</section>`}
+	${properes.length ? `<section class="m-wg m-agenda"><span class="m-wg-cap">${icona('calendari', 14)} El que ve</span><ul class="m-queve">${properes.map((e) => `<li class="${e.quan === 'Avui' || e.quan === 'Demà' ? 'aviat' : ''}"><span class="m-quan">${esc(e.quan)}${e.hora ? ` · ${esc(e.hora)}` : ''}</span><span class="m-que">${esc(e.text)}</span></li>`).join('')}</ul></section>` : ''}
 	${noticia ? targetaNoticia(noticia) : ''}
 	<div class="resum-fitxes">
 		${fitxaDespeses()}
@@ -651,7 +652,6 @@ function vistaAvui() {
 		<button type="button" data-vista="llista">${icona('llista', 20)}<b>${dadesCoses().coses.filter((c) => c.estat !== 'comprada').length}</b><small>Coses per comprar</small></button>
 		<button type="button" data-vista="vitrina">${icona('vitrina', 20)}<b>Vitrina</b><small>El que has fet</small></button>
 	</div>
-	${properes.length ? `<section class="m-wg"><span class="m-wg-cap">Properament</span><ul class="m-queve">${properes.map((e) => `<li><span class="m-quan">${esc(e.quan)}</span><span class="m-que">${esc(e.text)}</span>${e.hora ? `<small>${esc(e.hora)}</small>` : ''}</li>`).join('')}</ul></section>` : ''}
 	<section class="m-webs"><span class="m-wg-cap">Les teves webs</span>
 		<a href="https://arnausentiscort.github.io/llar/" target="_blank" rel="noopener">Llar<small>La llista, el menú i el calendari de casa</small>${icona('fletxa', 15)}</a>
 		<a href="https://arnausentiscort.github.io/real-tiesada/" target="_blank" rel="noopener">Real Tiesada<small>Estadístiques i anàlisi de l'equip</small>${icona('fletxa', 15)}</a>
@@ -799,13 +799,13 @@ function filaCosa(c, ambProjecte) {
 			c.regal ? `<span class="ll-xip regal">${icona('regal', 11)} Regal</span>` : '',
 			ambProjecte && c.projecte_nom ? `<span class="ll-xip">${esc(c.projecte_nom)}</span>` : '',
 		].join('')}</small></span>
-		<span class="ll-preu">${c.preu != null ? preuEur(c.preu) : '<em>per mirar</em>'}</span>`;
+		<span class="ll-preu">${c.preu_ara != null && c.preu_ara !== c.preu ? `${c.preu != null ? `<s>${preuEur(c.preu)}</s>` : ''}<b class="${c.preu != null && c.preu_ara < c.preu ? 'baixa-preu' : ''}">${preuEur(c.preu_ara)}</b>` : c.preu != null ? preuEur(c.preu) : '<em>per mirar</em>'}</span>`;
 	return `<li class="ll-cosa ${c.estat === 'comprada' ? 'comprada' : ''}" style="--c:${colorCosa(c)}">${
-		c.enllac && /^https:\/\//.test(c.enllac) ? `<a href="${esc(c.enllac)}" target="_blank" rel="noopener">${cos}${icona('fletxa', 14)}</a>` : `<div>${cos}</div>`
+		c.enllac && /^https:\/\//.test(c.enllac) ? `<a href="${esc(c.enllac)}" target="_blank" rel="noopener">${cos}${icona('fletxa', 14)}</a>` : `<div tabindex="0">${cos}</div>`
 	}</li>`;
 }
 function vistaLlista() {
-	const cap = `<header class="cap"><span class="sobre">Llista</span><h1>Per comprar</h1><p>Es fa sola amb la llista de compra de cada projecte i la teva. Toca una cosa per anar a la botiga.</p></header>`;
+	const cap = `<header class="cap"><span class="sobre">Llista</span><h1>Per comprar</h1><p>Es fa sola amb la llista de compra de cada projecte i la teva. Toca una cosa per anar a la botiga, o per llegir-la sencera si no té enllaç.</p></header>`;
 	if (!estat.personal) return `${cap}${formCodi('La teva llista', 'Posa el codi per veure-la.')}`;
 	const {coses, projectes} = dadesCoses();
 	const f = estat.filtreLlista;
@@ -813,7 +813,7 @@ function vistaLlista() {
 	const vull = dins.filter((c) => c.estat !== 'comprada');
 	const comprades = dins.filter((c) => c.estat === 'comprada');
 	const regals = coses.filter((c) => c.regal && c.estat !== 'comprada');
-	const suma = (l) => l.reduce((t, c) => t + (c.preu ?? 0), 0);
+	const suma = (l) => l.reduce((t, c) => t + (c.preu_ara ?? c.preu ?? 0), 0);
 	const filtres = [
 		['tot', 'Tot', coses.filter((c) => c.estat !== 'comprada').length],
 		['meu', 'Per a mi', coses.filter((c) => !c.projecte && !c.regal && c.estat !== 'comprada').length],
@@ -1529,6 +1529,7 @@ function pintar() {
 	${estat.carta ? vistaCarta() : ''}
 	${estat.projecte && estat.projectes?.[estat.projecte] ? vistaProjecte() : ''}`;
 	document.body.classList.toggle('llegint', estat.lector !== null || !!estat.projecte);
+	if (estat.vista === 'mercat') posarSalts();
 	if (estat.lector !== null) {
 		const pistes = document.getElementById('pistes');
 		pistes.scrollLeft = estat.lector * pistes.clientWidth;
@@ -1542,6 +1543,22 @@ function pintar() {
 		});
 	}
 }
+
+// el Mercat és molt llarg: una filera de botons a dalt (que es queda enganxada) per saltar a cada bloc
+const titolsMercat = () => [...document.querySelectorAll('main.pantalla .m-titol, main.pantalla .s-titol')];
+const nomTitol = (h) => (h.querySelector('.m-plegable-nom') ?? h).firstChild?.textContent.trim() ?? '';
+function posarSalts() {
+	const cap = document.querySelector('main.pantalla > .cap');
+	const titols = titolsMercat();
+	if (!cap || titols.length < 3) return;
+	cap.insertAdjacentHTML('afterend', `<nav class="filtres m-salts" aria-label="Blocs del Mercat">${titols.map((h, i) => `<button type="button" data-salt="${i}">${esc(nomTitol(h))}</button>`).join('')}</nav>`);
+}
+document.addEventListener('click', (ev) => {
+	const b = ev.target.closest('[data-salt]');
+	if (!b) return;
+	const h = titolsMercat()[Number(b.dataset.salt)];
+	h?.scrollIntoView({block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'});
+});
 
 function obrirLector(i) {
 	estat.lector = i;
