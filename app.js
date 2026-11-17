@@ -582,14 +582,28 @@ function fitxaDespeses() {
 // Avui: el resum de l'Arnau. L'activitat al davant, i després com van les notícies i els diners, i la nota per a Reshi
 // la fitxa del Mercat a Avui: el MSCI World (el teu pla) amb el preu, el canvi del dia i de la setmana i la línia del mes;
 // i, si els últims dies hi ha hagut un moviment fort, ho diu aquí mateix
+// el que té invertit de debò (amb el codi posat): quant val ara i quant hi guanya o hi perd
+const xifraFina = (x) => `${x.toLocaleString('ca-ES', Math.abs(x) < 1000 ? {minimumFractionDigits: 2, maximumFractionDigits: 2} : {maximumFractionDigits: 0})} €`;
+const signeFi = (x) => `${x >= 0 ? '+' : '−'}${xifraFina(Math.abs(x))}`;
+function meuInvertit() {
+	const inv = estat.diners?.inversions ?? [];
+	const aportat = inv.reduce((t, i) => t + i.aportat, 0);
+	if (!aportat) return null;
+	const valor = inv.reduce((t, i) => t + i.valor, 0);
+	return {valor, guany: valor - aportat - inv.reduce((t, i) => t + i.saveback, 0)};
+}
 function fitxaMercat(msci) {
 	if (!msci) return `<button type="button" class="gran" data-vista="mercat">${icona('mercat', 20)}<b>Mercat</b><small>Com està la borsa</small></button>`;
 	const fort = (estat.dades.mercat?.moviments ?? []).filter((x) => !FORA_DE_L_AVIS.includes(x.id)).sort((a, b) => b.data.localeCompare(a.data) || Math.abs(b.pct) - Math.abs(a.pct))[0];
 	const dia = msci.canvis.dia;
+	const meu = meuInvertit();
+	const btc = estat.dades.mercat?.actius?.find((x) => x.id === 'btc');
+	const preus = `<span class="avui-mercat-preus">${meu ? `<span>MSCI World <b>${preu(msci)}</b></span>` : ''}${btc ? `<span>Bitcoin <b>${preu(btc)}</b> <i class="${btc.canvis.setmana >= 0 ? 'puja' : 'baixa'}">${pct(btc.canvis.setmana)}</i></span>` : ''}</span>`;
 	return `<button type="button" class="gran avui-mercat ${msci.canvis.setmana >= 0 ? 'puja' : 'baixa'}" data-vista="mercat">
-		<span class="avui-mercat-cap"><span class="etiqueta">${icona('mercat', 12)} El teu MSCI World</span><span class="avui-mercat-mes ${msci.canvis.setmana >= 0 ? 'puja' : 'baixa'}">${msci.canvis.setmana >= 0 ? '↗' : '↘'} ${pct(msci.canvis.setmana)} la setmana</span></span>
-		<span class="avui-mercat-cos"><strong>${preu(msci)}</strong>${dia !== undefined && msci.dia_data ? `<span class="avui-mercat-dia ${dia < 0 ? 'baixa' : 'puja'}">${esc(dataCurta(msci.dia_data))} ${pct(dia)}</span>` : ''}</span>
+		<span class="avui-mercat-cap"><span class="etiqueta">${icona('mercat', 12)} ${meu ? 'Els teus diners invertits' : 'El teu MSCI World'}</span><span class="avui-mercat-mes ${msci.canvis.setmana >= 0 ? 'puja' : 'baixa'}">${msci.canvis.setmana >= 0 ? '↗' : '↘'} ${pct(msci.canvis.setmana)} la setmana</span></span>
+		<span class="avui-mercat-cos">${meu ? `<strong>${xifraFina(meu.valor)}</strong><span class="avui-mercat-dia ${meu.guany < 0 ? 'baixa' : 'puja'}">${signeFi(meu.guany)}</span>` : `<strong>${preu(msci)}</strong>${dia !== undefined && msci.dia_data ? `<span class="avui-mercat-dia ${dia < 0 ? 'baixa' : 'puja'}">${esc(dataCurta(msci.dia_data))} ${pct(dia)}</span>` : ''}`}</span>
 		${linia(msci.serie, msci.canvis.setmana >= 0)}
+		${preus}
 		${fort ? `<span class="avui-mercat-fort">${esc(dataCurta(fort.data))}: ${esc(fort.nom)} ${pct(fort.pct)}${fort.pct < 0 ? '' : ''}<em>Mercat →</em></span>` : `<span class="avui-mercat-fort calma">Cap moviment fort els últims dies<em>Mercat →</em></span>`}
 	</button>`;
 }
@@ -609,7 +623,9 @@ function avuiDeDebo(noves, msci) {
 	let properes = cal.filter((x) => !passat(x)).slice(0, 6).map((x) => ({data: x.inici.slice(0, 10), quan: quanEs(x.inici), text: x.titol, hora: x.tot_el_dia ? '' : x.inici.slice(11, 16)}));
 	if (!properes.length) properes = e.agenda.filter((a) => a.data >= avui()).slice(0, 4).map((a) => ({data: a.data, quan: quanEs(a.data), text: a.text, hora: ''}));
 	const parts = [];
-	if (msci) parts.push(`El teu MSCI World ${msci.canvis.setmana >= 0 ? 'puja' : 'baixa'} un ${Math.abs(Math.round(msci.canvis.setmana * 10) / 10).toLocaleString('ca-ES')} % aquesta setmana.`);
+	const meu = meuInvertit();
+	if (meu) parts.push(`Tens ${xifraFina(meu.valor)} invertits (${signeFi(meu.guany)}).`);
+	if (msci) parts.push(`${meu ? 'El' : 'El teu'} MSCI World ${msci.canvis.setmana >= 0 ? 'puja' : 'baixa'} un ${Math.abs(Math.round(msci.canvis.setmana * 10) / 10).toLocaleString('ca-ES')} % aquesta setmana.`);
 	const avuiEv = properes.find((x) => x.data === avui());
 	const demaEv = properes.find((x) => x.quan === 'Demà');
 	if (avuiEv) parts.push(`Avui: ${avuiEv.text}.`);
