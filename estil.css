@@ -1119,3 +1119,5 @@ main.pantalla .m-titol, main.pantalla .s-titol { scroll-margin-top: 80px; }
 .avui-mercat-preus i { font-style: normal; font-weight: 600; }
 .avui-mercat-preus i.puja { color: var(--bo); }
 .avui-mercat-preus i.baixa { color: var(--dolent); }
+.resum-fitxes .avui-mercat-preus b { font-size: inherit; font-weight: 600; line-height: inherit; letter-spacing: 0; }
+.resum-fitxes .avui-mercat-preus > span { white-space: nowrap; }

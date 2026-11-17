@@ -583,14 +583,17 @@ function fitxaDespeses() {
 // la fitxa del Mercat a Avui: el MSCI World (el teu pla) amb el preu, el canvi del dia i de la setmana i la línia del mes;
 // i, si els últims dies hi ha hagut un moviment fort, ho diu aquí mateix
 // el que té invertit de debò (amb el codi posat): quant val ara i quant hi guanya o hi perd
-const xifraFina = (x) => `${x.toLocaleString('ca-ES', Math.abs(x) < 1000 ? {minimumFractionDigits: 2, maximumFractionDigits: 2} : {maximumFractionDigits: 0})} €`;
+const xifraFina = (x) => `${x.toLocaleString('ca-ES', Math.abs(x) < 10000 ? {minimumFractionDigits: 2, maximumFractionDigits: 2} : {maximumFractionDigits: 0})} €`;
 const signeFi = (x) => `${x >= 0 ? '+' : '−'}${xifraFina(Math.abs(x))}`;
 function meuInvertit() {
 	const inv = estat.diners?.inversions ?? [];
 	const aportat = inv.reduce((t, i) => t + i.aportat, 0);
 	if (!aportat) return null;
 	const valor = inv.reduce((t, i) => t + i.valor, 0);
-	return {valor, guany: valor - aportat - inv.reduce((t, i) => t + i.saveback, 0)};
+	// a quin preu ho va comprar: el de la compra si només n'hi ha una, o el preu mitjà de totes
+	const compres = inv.flatMap((i) => i.compres.filter((c) => !c.saveback));
+	const parts = compres.reduce((t, c) => t + c.participacions, 0);
+	return {valor, guany: valor - aportat - inv.reduce((t, i) => t + i.saveback, 0), comprat: parts ? aportat / parts : null, unaCompra: compres.length === 1};
 }
 function fitxaMercat(msci) {
 	if (!msci) return `<button type="button" class="gran" data-vista="mercat">${icona('mercat', 20)}<b>Mercat</b><small>Com està la borsa</small></button>`;
@@ -598,7 +601,7 @@ function fitxaMercat(msci) {
 	const dia = msci.canvis.dia;
 	const meu = meuInvertit();
 	const btc = estat.dades.mercat?.actius?.find((x) => x.id === 'btc');
-	const preus = `<span class="avui-mercat-preus">${meu ? `<span>MSCI World <b>${preu(msci)}</b></span>` : ''}${btc ? `<span>Bitcoin <b>${preu(btc)}</b> <i class="${btc.canvis.setmana >= 0 ? 'puja' : 'baixa'}">${pct(btc.canvis.setmana)}</i></span>` : ''}</span>`;
+	const preus = `<span class="avui-mercat-preus">${meu ? `<span>MSCI World <b>${preu(msci)}</b>${meu.comprat ? ` · ${meu.unaCompra ? 'comprat a' : 'comprat de mitjana a'} <b>${xifraFina(meu.comprat)}</b>` : ''}</span>` : ''}${btc ? `<span>Bitcoin <b>${preu(btc)}</b> <i class="${btc.canvis.setmana >= 0 ? 'puja' : 'baixa'}">${pct(btc.canvis.setmana)}</i></span>` : ''}</span>`;
 	return `<button type="button" class="gran avui-mercat ${msci.canvis.setmana >= 0 ? 'puja' : 'baixa'}" data-vista="mercat">
 		<span class="avui-mercat-cap"><span class="etiqueta">${icona('mercat', 12)} ${meu ? 'Els teus diners invertits' : 'El teu MSCI World'}</span><span class="avui-mercat-mes ${msci.canvis.setmana >= 0 ? 'puja' : 'baixa'}">${msci.canvis.setmana >= 0 ? '↗' : '↘'} ${pct(msci.canvis.setmana)} la setmana</span></span>
 		<span class="avui-mercat-cos">${meu ? `<strong>${xifraFina(meu.valor)}</strong><span class="avui-mercat-dia ${meu.guany < 0 ? 'baixa' : 'puja'}">${signeFi(meu.guany)}</span>` : `<strong>${preu(msci)}</strong>${dia !== undefined && msci.dia_data ? `<span class="avui-mercat-dia ${dia < 0 ? 'baixa' : 'puja'}">${esc(dataCurta(msci.dia_data))} ${pct(dia)}</span>` : ''}`}</span>
@@ -659,12 +662,12 @@ function vistaAvui() {
 		${AMB_GIMNAS ? `<p class="act-peu"><b>${gimnasos} de ${a.objectius.gimnas}</b> dies de gimnàs aquesta setmana</p>` : ''}
 		<button type="button" class="act-mes-boto" data-vista="activitat">Tota l’activitat ${icona('endavant', 16)}</button>
 	</section>`}
+	<div class="resum-fitxes">${fitxaMercat(msci)}</div>
 	${properes.length ? `<section class="m-wg m-agenda"><span class="m-wg-cap">${icona('calendari', 14)} El que ve</span><ul class="m-queve">${properes.map((e) => `<li class="${e.quan === 'Avui' || e.quan === 'Demà' ? 'aviat' : ''}"><span class="m-quan">${esc(e.quan)}${e.hora ? ` · ${esc(e.hora)}` : ''}</span><span class="m-que">${esc(e.text)}</span></li>`).join('')}</ul></section>` : ''}
 	${noticia ? targetaNoticia(noticia) : ''}
 	<div class="resum-fitxes">
 		${fitxaDespeses()}
 		<button type="button" data-vista="noticies">${icona('noticies', 20)}<b>${n ? `${n} ${n === 1 ? 'nova' : 'noves'}` : 'Al dia'}</b><small>Notícies</small></button>
-		${fitxaMercat(msci)}
 		<button type="button" data-vista="llista">${icona('llista', 20)}<b>${dadesCoses().coses.filter((c) => c.estat !== 'comprada').length}</b><small>Coses per comprar</small></button>
 		<button type="button" data-vista="vitrina">${icona('vitrina', 20)}<b>Vitrina</b><small>El que has fet</small></button>
 	</div>
