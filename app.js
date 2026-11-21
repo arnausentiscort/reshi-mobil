@@ -587,13 +587,15 @@ const xifraFina = (x) => `${x.toLocaleString('ca-ES', Math.abs(x) < 10000 ? {min
 const signeFi = (x) => `${x >= 0 ? '+' : '−'}${xifraFina(Math.abs(x))}`;
 function meuInvertit() {
 	const inv = estat.diners?.inversions ?? [];
+	const cripto = estat.diners?.cripto ?? [];
 	const aportat = inv.reduce((t, i) => t + i.aportat, 0);
-	if (!aportat) return null;
-	const valor = inv.reduce((t, i) => t + i.valor, 0);
+	if (!aportat && !cripto.length) return null;
+	const valor = inv.reduce((t, i) => t + i.valor, 0) + cripto.reduce((t, c) => t + c.valor, 0);
 	// a quin preu ho va comprar: el de la compra si només n'hi ha una, o el preu mitjà de totes
 	const compres = inv.flatMap((i) => i.compres.filter((c) => !c.saveback));
 	const parts = compres.reduce((t, c) => t + c.participacions, 0);
-	return {valor, guany: valor - aportat - inv.reduce((t, i) => t + i.saveback, 0), comprat: parts ? aportat / parts : null, unaCompra: compres.length === 1};
+	const guany = inv.reduce((t, i) => t + i.valor - i.aportat - i.saveback, 0) + cripto.reduce((t, c) => t + c.guany, 0);
+	return {valor, guany, comprat: parts ? aportat / parts : null, unaCompra: compres.length === 1};
 }
 function fitxaMercat(msci) {
 	if (!msci) return `<button type="button" class="gran" data-vista="mercat">${icona('mercat', 20)}<b>Mercat</b><small>Com està la borsa</small></button>`;
@@ -1036,9 +1038,13 @@ function dinsMsci(d, setmanaFons) {
 function dinersMeus() {
 	const d = estat.diners;
 	if (!d) return estat.personal ? '' : formCodi('Els teus diners', 'Posa el codi per veure el que tens de debò al compte i invertit.');
-	const invertit = d.inversions.reduce((t, i) => t + i.valor, 0);
-	const aportat = d.inversions.reduce((t, i) => t + i.aportat, 0);
-	const guany = invertit - aportat - d.inversions.reduce((t, i) => t + i.saveback, 0);
+	const criptos = d.cripto ?? [];
+	const invertitInversions = d.inversions.reduce((t, i) => t + i.valor, 0);
+	const aportatInversions = d.inversions.reduce((t, i) => t + i.aportat, 0);
+	const invertit = invertitInversions + criptos.reduce((t, c) => t + c.valor, 0);
+	const aportat = aportatInversions + criptos.reduce((t, c) => t + c.import, 0);
+	const guany = invertitInversions - aportatInversions - d.inversions.reduce((t, i) => t + i.saveback, 0) + criptos.reduce((t, c) => t + c.guany, 0);
+	const inversionsActives = d.inversions.filter((i) => i.valor > 0);
 	return `<section class="m-bloc">
 		<h2 class="m-titol">Els meus diners <small>el que tens de debò a ${esc(d.compte.nom)}</small></h2>
 		<div class="m-cartera m-dues m-meus">
@@ -1048,8 +1054,8 @@ function dinersMeus() {
 					<div><span>Al compte</span><b>${eur(d.compte.saldo_ara)}</b><small>al ${d.compte.interes.toLocaleString('ca-ES')} %: uns ${eur(d.compte.interessos_any)} l’any nets</small></div>
 					<div><span>Invertit</span><b>${eur(invertit)}</b><small class="${!aportat ? '' : guany >= 0 ? 'puja' : 'baixa'}">${aportat ? `${signeDiners(guany)} sobre el que hi has posat` : 'encara no ha començat'}</small></div>
 				</div>
-				${invertit > 0 ? repartiment([...d.inversions.filter((i) => i.valor > 0).map((i, k) => ({nom: i.nom, valor: i.valor, color: COLORS_PARTS[k % COLORS_PARTS.length]})), {nom: 'Al compte', valor: d.compte.saldo_ara, color: COLOR_RESERVA}]) : ''}
-				<p class="m-costos">El saldo és el del ${dataBarra(d.compte.data)}, menys el que en treu el pla i més els interessos (ja sense el 19 % d’Hisenda). La nòmina que hi entra no la sé: dis-m’ho i el poso al dia.</p>
+				${invertit > 0 ? repartiment([...inversionsActives.map((i, k) => ({nom: i.nom, valor: i.valor, color: COLORS_PARTS[k % COLORS_PARTS.length]})), ...criptos.filter((c) => c.valor > 0).map((c, k) => ({nom: c.nom, valor: c.valor, color: COLORS_PARTS[(inversionsActives.length + k) % COLORS_PARTS.length]})), {nom: 'Al compte', valor: d.compte.saldo_ara, color: COLOR_RESERVA}]) : ''}
+				<p class="m-costos">El saldo és el del ${dataBarra(d.compte.data)}, menys el que en treuen el pla i el Bitcoin, i més els interessos (ja sense el 19 % d’Hisenda). La nòmina que hi entra no la sé: dis-m’ho i el poso al dia.</p>
 			</div>
 			<ul class="m-posicions">${d.inversions
 				.map(
@@ -1065,6 +1071,13 @@ function dinersMeus() {
 					.join('')}</tbody></table></div>`
 						: `<p>El pla comença el <b>${dataBarra(i.inici)}</b>: ${eur(i.import)} cada mes, sense comissió. ISIN ${esc(i.isin)}. També hi va a parar l’1 % del Saveback de la targeta.</p>`
 				}</li>`,
+				)
+				.join('')}${criptos
+				.map(
+					(c) => `<li><header><b>${esc(c.nom)}</b>${c.setmana != null ? `<span class="${c.setmana >= 0 ? 'puja' : 'baixa'}">${pct(c.setmana)}</span>` : ''}</header>
+				<p>Hi has posat <b>${eur(c.import)}</b> el ${dataBarra(c.data)} · ${c.quantitat.toLocaleString('ca-ES', {minimumFractionDigits: 6, maximumFractionDigits: 6})} ${esc(c.simbol.split('-')[0])} a ${eur(c.preu)}${
+						c.preu_ara !== null ? ` · ara valen <b>${eur(c.valor)}</b> (${signeDiners(c.guany)}); si els vengués avui, en quedarien ${eur(c.net)}` : ''
+					}.</p></li>`,
 				)
 				.join('')}</ul>
 		</div>

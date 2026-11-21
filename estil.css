@@ -1121,3 +1121,8 @@ main.pantalla .m-titol, main.pantalla .s-titol { scroll-margin-top: 80px; }
 .avui-mercat-preus i.baixa { color: var(--dolent); }
 .resum-fitxes .avui-mercat-preus b { font-size: inherit; font-weight: 600; line-height: inherit; letter-spacing: 0; }
 .resum-fitxes .avui-mercat-preus > span { white-space: nowrap; }
+
+/* el % de la setmana d'una cripto, a la dreta de la capçalera de la posició */
+.m-posicions header span.puja, .m-posicions header span.baixa { margin-left: auto; font-weight: 700; }
+.m-posicions header span.puja { color: var(--bo); }
+.m-posicions header span.baixa { color: var(--dolent); }
