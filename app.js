@@ -1216,7 +1216,7 @@ function parsejarPreuSim(s) {
 }
 function calcularNetSim(a, preuObj, costos) {
 	const brut = a.unitats * preuObj;
-	const spread = a.esCripto ? brut * (costos?.spread_cripto ?? 0.01) : 0;
+	const spread = a.esCripto ? brut * (costos?.spread_cripto ?? 0.0166) : 0;
 	const ordre = brut > 0 ? (costos?.ordre ?? 1) : 0;
 	const venda = Math.max(0, brut - spread - ordre);
 	const guanyFiscal = venda - a.baseFiscal;
@@ -1258,7 +1258,7 @@ function simuladorVenda() {
 	const actiu = actius.find((x) => x.id === estat.simActiu) ?? actius[0];
 	estat.simActiu = actiu.id;
 	if (estat.simPreu === null) estat.simPreu = preuDefecteSim(actiu);
-	const costos = d.costos ?? {ordre: 1, spread_cripto: 0.01, impost: 0.19};
+	const costos = d.costos ?? {ordre: 1, spread_cripto: 0.0166, impost: 0.19};
 	const escenaris = escenarisPer(actiu);
 	const fmtPreu = (v) => `${v.toLocaleString('ca-ES', {maximumFractionDigits: v >= 1000 ? 0 : 2})} €`;
 	const amagat = estat.amagat;
