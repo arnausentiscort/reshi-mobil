@@ -1126,3 +1126,52 @@ main.pantalla .m-titol, main.pantalla .s-titol { scroll-margin-top: 80px; }
 .m-posicions header span.puja, .m-posicions header span.baixa { margin-left: auto; font-weight: 700; }
 .m-posicions header span.puja { color: var(--bo); }
 .m-posicions header span.baixa { color: var(--dolent); }
+
+/* --- 24/11/2026: diners reals al davant a l'Avui i al Mercat, botó d'amagar i simulador "Si ho vengués a…" --- */
+.avui-mercat { cursor: pointer; }
+.avui-mercat-cap-dreta { display: inline-flex; align-items: center; gap: var(--espai-2); }
+.avui-ull { position: relative; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: var(--r-xs); color: var(--text-3); background: rgba(var(--t), 0.06); cursor: pointer; }
+.avui-ull::after { content: ''; position: absolute; inset: 50% auto auto 50%; width: 44px; height: 44px; transform: translate(-50%, -50%); }
+.avui-desglossament { display: flex; flex-wrap: wrap; gap: var(--espai-1) var(--espai-4); width: 100%; margin: 2px 0; }
+.avui-pos { display: flex; align-items: baseline; gap: 6px; font-size: var(--m-nota); }
+.avui-pos span { color: var(--text-3); }
+.avui-pos b { font-family: var(--lletra); font-size: var(--m-nota); font-weight: 600; font-variant-numeric: tabular-nums; color: var(--fort); }
+.avui-pos i { font-style: normal; font-size: var(--m-nota); font-weight: 600; font-variant-numeric: tabular-nums; }
+.avui-pos i.puja { color: var(--bo); }
+.avui-pos i.baixa { color: var(--dolent); }
+.avui-amagat-nota { font-size: var(--m-nota); color: var(--text-3); }
+
+/* Mercat: capçalera de Preus i Els meus diners amb botó d'amagar, i diners reals a les targetes de Preus */
+.m-preus-cap { display: flex; align-items: center; justify-content: space-between; gap: var(--espai-2); }
+.m-meus-cap { display: flex; flex-wrap: wrap; align-items: center; gap: 4px var(--espai-2); }
+.m-meus-cap .m-boto-amagar { margin-left: auto; }
+.m-boto-amagar { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 var(--espai-3); border: 0; border-radius: 999px; font-family: var(--lletra); font-size: var(--m-nota); font-weight: 600; color: var(--text-2); background: rgba(var(--t), 0.06); cursor: pointer; }
+.m-boto-amagar[aria-pressed='true'] { color: var(--fort); background: rgba(var(--t), 0.12); }
+.m-preu-meu { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--espai-2); }
+.m-preu-guany { font-size: var(--m-sub); font-weight: 600; font-variant-numeric: tabular-nums; }
+.m-preu-guany.puja { color: var(--bo); }
+.m-preu-guany.baixa { color: var(--dolent); }
+.m-preu-mercat { font-size: var(--m-nota); color: var(--text-3); font-variant-numeric: tabular-nums; }
+
+/* Mercat: simulador "Si ho vengués a…" */
+.m-sim { display: flex; flex-direction: column; gap: var(--espai-4); }
+.m-sim-tabs { margin: 0 !important; padding: 0 !important; }
+.m-sim-barra { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--espai-3) var(--espai-5); }
+.m-sim-camp { display: flex; flex-direction: column; gap: 6px; }
+.m-sim-camp > span:first-child { font-size: var(--m-nota); color: var(--text-3); }
+.m-sim-input { display: inline-flex; align-items: center; gap: var(--espai-2); height: 42px; padding: 0 var(--espai-3); border-radius: var(--r-s); background: rgba(var(--t), 0.06); box-shadow: inset 0 0 0 1px var(--vora-forta); }
+.m-sim-input:focus-within { background: var(--fons); box-shadow: inset 0 0 0 1.5px var(--or); }
+.m-sim-input input { width: 120px; border: 0; outline: 0; background: none; font-family: var(--mono); font-size: var(--m-sub); font-weight: 700; font-variant-numeric: tabular-nums; color: var(--fort); }
+.m-sim-input em { font-style: normal; font-weight: 600; color: var(--text-3); }
+.m-sim-res { display: flex; flex-wrap: wrap; gap: var(--espai-3) var(--espai-5); }
+.m-sim-res > div { display: flex; flex-direction: column; gap: 2px; }
+.m-sim-res span { font-size: var(--m-nota); color: var(--text-3); }
+.m-sim-res b { font-size: 22px; font-weight: 700; line-height: 1.1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--fort); }
+.m-sim-res b.puja { color: var(--bo); }
+.m-sim-res b.baixa { color: var(--dolent); }
+.m-sim-res small { font-size: var(--m-sub); font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-2); }
+.m-sim-taula tbody tr { cursor: pointer; }
+.m-sim-taula tbody tr.ara { background: rgba(var(--or-rgb), 0.1); }
+.m-sim-taula td.puja { color: var(--bo); }
+.m-sim-taula td.baixa { color: var(--dolent); }
+.m-sim-taula strong { color: var(--fort); }

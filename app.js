@@ -96,6 +96,9 @@ const estat = {
 	filtreLlista: 'tot', // tot, meu, regals o l'id d'un projecte
 	carta: false, // la carta de regals oberta
 	mesDespeses: null, // el mes que es mira a les despeses (per defecte, l'últim sencer)
+	amagat: guardat.llegir('reshi-amagar-diners', false) === true || guardat.llegir('reshi-amagar-diners', 0) === 1, // amagar les xifres dels diners reals
+	simActiu: null, // l'actiu triat al simulador "Si ho vengués a…"
+	simPreu: null, // el preu escrit al simulador
 };
 const desarVistes = () => guardat.posar('reshi-vistes', [...estat.vistes]);
 const llegir = (id) => {
@@ -597,20 +600,56 @@ function meuInvertit() {
 	const guany = inv.reduce((t, i) => t + i.valor - i.aportat - i.saveback, 0) + cripto.reduce((t, c) => t + c.guany, 0);
 	return {valor, guany, comprat: parts ? aportat / parts : null, unaCompra: compres.length === 1};
 }
+function criptosAgrupades(d) {
+	const acc = {};
+	for (const c of d?.cripto ?? []) {
+		const prev = acc[c.simbol];
+		acc[c.simbol] = prev
+			? {nom: c.nom, valor: prev.valor + c.valor, import: prev.import + c.import, guany: prev.guany + c.guany}
+			: {nom: c.nom, valor: c.valor, import: c.import, guany: c.guany};
+	}
+	return Object.values(acc);
+}
 function fitxaMercat(msci) {
 	if (!msci) return `<button type="button" class="gran" data-vista="mercat">${icona('mercat', 20)}<b>Mercat</b><small>Com està la borsa</small></button>`;
 	const fort = (estat.dades.mercat?.moviments ?? []).filter((x) => !FORA_DE_L_AVIS.includes(x.id)).sort((a, b) => b.data.localeCompare(a.data) || Math.abs(b.pct) - Math.abs(a.pct))[0];
 	const dia = msci.canvis.dia;
+	const d = estat.diners;
 	const meu = meuInvertit();
 	const btc = estat.dades.mercat?.actius?.find((x) => x.id === 'btc');
-	const preus = `<span class="avui-mercat-preus">${meu ? `<span>MSCI World <b>${preu(msci)}</b>${meu.comprat ? ` · ${meu.unaCompra ? 'comprat a' : 'comprat de mitjana a'} <b>${xifraFina(meu.comprat)}</b>` : ''}</span>` : ''}${btc ? `<span>Bitcoin <b>${preu(btc)}</b> <i class="${btc.canvis.setmana >= 0 ? 'puja' : 'baixa'}">${pct(btc.canvis.setmana)}</i></span>` : ''}</span>`;
-	return `<button type="button" class="gran avui-mercat ${msci.canvis.setmana >= 0 ? 'puja' : 'baixa'}" data-vista="mercat">
-		<span class="avui-mercat-cap"><span class="etiqueta">${icona('mercat', 12)} ${meu ? 'Els teus diners invertits' : 'El teu MSCI World'}</span><span class="avui-mercat-mes ${msci.canvis.setmana >= 0 ? 'puja' : 'baixa'}">${msci.canvis.setmana >= 0 ? '↗' : '↘'} ${pct(msci.canvis.setmana)} la setmana</span></span>
-		<span class="avui-mercat-cos">${meu ? `<strong>${xifraFina(meu.valor)}</strong><span class="avui-mercat-dia ${meu.guany < 0 ? 'baixa' : 'puja'}">${signeFi(meu.guany)}</span>` : `<strong>${preu(msci)}</strong>${dia !== undefined && msci.dia_data ? `<span class="avui-mercat-dia ${dia < 0 ? 'baixa' : 'puja'}">${esc(dataCurta(msci.dia_data))} ${pct(dia)}</span>` : ''}`}</span>
+	const preus = `<span class="avui-mercat-preus">${meu ? `<span>MSCI World <b>${preu(msci)}</b>${!estat.amagat && meu.comprat ? ` · ${meu.unaCompra ? 'comprat a' : 'comprat de mitjana a'} <b>${xifraFina(meu.comprat)}</b>` : ''}</span>` : ''}${btc ? `<span>Bitcoin <b>${preu(btc)}</b> <i class="${btc.canvis.setmana >= 0 ? 'puja' : 'baixa'}">${pct(btc.canvis.setmana)}</i></span>` : ''}</span>`;
+	const desglossament =
+		d && !estat.amagat
+			? `<div class="avui-desglossament">
+				<div class="avui-pos"><span>Al compte</span><b>${xifraFina(d.compte.saldo_ara)}</b></div>
+				${(d.inversions ?? [])
+					.filter((i) => i.valor > 0 || i.compres.length > 0)
+					.map((i) => {
+						const g = i.valor - i.aportat - i.saveback;
+						return `<div class="avui-pos"><span>${esc(i.nom)}</span><b>${xifraFina(i.valor)}</b><i class="${g >= 0 ? 'puja' : 'baixa'}">${signeFi(g)}</i></div>`;
+					})
+					.join('')}
+				${criptosAgrupades(d)
+					.map((c) => `<div class="avui-pos"><span>${esc(c.nom)}</span><b>${xifraFina(c.valor)}</b><i class="${c.guany >= 0 ? 'puja' : 'baixa'}">${signeFi(c.guany)}</i></div>`)
+					.join('')}
+			</div>`
+			: d && estat.amagat
+				? `<span class="avui-amagat-nota">Xifres amagades · toca l’ull per veure-les</span>`
+				: '';
+	return `<div role="button" tabindex="0" class="gran avui-mercat ${msci.canvis.setmana >= 0 ? 'puja' : 'baixa'}" data-vista="mercat">
+		<span class="avui-mercat-cap">
+			<span class="etiqueta">${icona('mercat', 12)} ${d ? 'Els teus diners' : 'El teu MSCI World'}</span>
+			<span class="avui-mercat-cap-dreta">
+				<span class="avui-mercat-mes ${msci.canvis.setmana >= 0 ? 'puja' : 'baixa'}">${msci.canvis.setmana >= 0 ? '↗' : '↘'} ${pct(msci.canvis.setmana)} la setmana</span>
+				${d ? `<button type="button" class="avui-ull" data-amagar-diners aria-pressed="${estat.amagat}" aria-label="${estat.amagat ? 'Mostrar els meus diners' : 'Amagar els meus diners'}" title="${estat.amagat ? 'Mostrar els meus diners' : 'Amagar els meus diners'}">${icona(estat.amagat ? 'ull-tancat' : 'ull', 16)}</button>` : ''}
+			</span>
+		</span>
+		<span class="avui-mercat-cos">${d ? `<strong>${estat.amagat ? '•••• €' : xifraFina(d.total)}</strong>${meu && !estat.amagat ? `<span class="avui-mercat-dia ${meu.guany < 0 ? 'baixa' : 'puja'}">${signeFi(meu.guany)}</span>` : ''}` : `<strong>${preu(msci)}</strong>${dia !== undefined && msci.dia_data ? `<span class="avui-mercat-dia ${dia < 0 ? 'baixa' : 'puja'}">${esc(dataCurta(msci.dia_data))} ${pct(dia)}</span>` : ''}`}</span>
+		${desglossament}
 		${linia(msci.serie, msci.canvis.setmana >= 0)}
 		${preus}
-		${fort ? `<span class="avui-mercat-fort">${esc(dataCurta(fort.data))}: ${esc(fort.nom)} ${pct(fort.pct)}${fort.pct < 0 ? '' : ''}<em>Mercat →</em></span>` : `<span class="avui-mercat-fort calma">Cap moviment fort els últims dies<em>Mercat →</em></span>`}
-	</button>`;
+		${fort ? `<span class="avui-mercat-fort">${esc(dataCurta(fort.data))}: ${esc(fort.nom)} ${pct(fort.pct)}<em>Mercat →</em></span>` : `<span class="avui-mercat-fort calma">Cap moviment fort els últims dies<em>Mercat →</em></span>`}
+	</div>`;
 }
 
 // el que val la pena saber ara: una frase, la notícia que més importa i el que ve (calendari, o l'agenda de les notícies)
@@ -628,9 +667,14 @@ function avuiDeDebo(noves, msci) {
 	let properes = cal.filter((x) => !passat(x)).slice(0, 6).map((x) => ({data: x.inici.slice(0, 10), quan: quanEs(x.inici), text: x.titol, hora: x.tot_el_dia ? '' : x.inici.slice(11, 16)}));
 	if (!properes.length) properes = e.agenda.filter((a) => a.data >= avui()).slice(0, 4).map((a) => ({data: a.data, quan: quanEs(a.data), text: a.text, hora: ''}));
 	const parts = [];
+	const d = estat.diners;
 	const meu = meuInvertit();
-	if (meu) parts.push(`Tens ${xifraFina(meu.valor)} invertits (${signeFi(meu.guany)}).`);
-	if (msci) parts.push(`${meu ? 'El' : 'El teu'} MSCI World ${msci.canvis.setmana >= 0 ? 'puja' : 'baixa'} un ${Math.abs(Math.round(msci.canvis.setmana * 10) / 10).toLocaleString('ca-ES')} % aquesta setmana.`);
+	if (d && !estat.amagat) {
+		if (meu) parts.push(`Tens ${xifraFina(d.total)} (${xifraFina(meu.valor)} invertits, ${signeFi(meu.guany)}).`);
+		else parts.push(`Tens ${xifraFina(d.total)} al compte.`);
+	} else if (!d && msci) {
+		parts.push(`El teu MSCI World ${msci.canvis.setmana >= 0 ? 'puja' : 'baixa'} un ${Math.abs(Math.round(msci.canvis.setmana * 10) / 10).toLocaleString('ca-ES')} % aquesta setmana.`);
+	}
 	const avuiEv = properes.find((x) => x.data === avui());
 	const demaEv = properes.find((x) => x.quan === 'Demà');
 	if (avuiEv) parts.push(`Avui: ${avuiEv.text}.`);
@@ -1034,10 +1078,39 @@ function dinsMsci(d, setmanaFons) {
 	</section>`;
 }
 
-// els seus diners de debò: el compte i el pla, amb les compres estimades fins que n'hi ha la real
+const botoAmagar = () =>
+	estat.diners
+		? `<button type="button" class="m-boto-amagar" data-amagar-diners aria-pressed="${estat.amagat}" title="${estat.amagat ? 'Mostrar els meus diners' : 'Amagar els meus diners'}">${icona(estat.amagat ? 'ull-tancat' : 'ull', 14)} ${estat.amagat ? 'Mostra' : 'Amaga'}</button>`
+		: '';
+
+function posicioMeva(id) {
+	const meus = estat.diners;
+	if (!meus) return null;
+	if (id === 'msci') {
+		const invs = meus.inversions ?? [];
+		const valor = invs.reduce((s, i) => s + i.valor, 0);
+		const aportat = invs.reduce((s, i) => s + i.aportat, 0);
+		if (!valor && !aportat) return null;
+		const guany = invs.reduce((s, i) => s + i.valor - i.aportat - i.saveback, 0);
+		return {valor, aportat, guany};
+	}
+	if (id === 'btc') {
+		const btcs = (meus.cripto ?? []).filter((c) => c.simbol.toUpperCase().startsWith('BTC'));
+		if (!btcs.length) return null;
+		return {
+			valor: btcs.reduce((s, c) => s + c.valor, 0),
+			aportat: btcs.reduce((s, c) => s + c.import, 0),
+			guany: btcs.reduce((s, c) => s + c.guany, 0),
+		};
+	}
+	return null;
+}
+
+// els seus diners de debò: el compte, el pla (compres estimades fins que n'hi ha la real) i les cripto
 function dinersMeus() {
 	const d = estat.diners;
 	if (!d) return estat.personal ? '' : formCodi('Els teus diners', 'Posa el codi per veure el que tens de debò al compte i invertit.');
+	const amagat = estat.amagat;
 	const criptos = d.cripto ?? [];
 	const invertitInversions = d.inversions.reduce((t, i) => t + i.valor, 0);
 	const aportatInversions = d.inversions.reduce((t, i) => t + i.aportat, 0);
@@ -1046,40 +1119,188 @@ function dinersMeus() {
 	const guany = invertitInversions - aportatInversions - d.inversions.reduce((t, i) => t + i.saveback, 0) + criptos.reduce((t, c) => t + c.guany, 0);
 	const inversionsActives = d.inversions.filter((i) => i.valor > 0);
 	return `<section class="m-bloc">
-		<h2 class="m-titol">Els meus diners <small>el que tens de debò a ${esc(d.compte.nom)}</small></h2>
+		<h2 class="m-titol m-meus-cap">Els meus diners <small>el que tens de debò a ${esc(d.compte.nom)}</small>${botoAmagar()}</h2>
 		<div class="m-cartera m-dues m-meus">
 			<div class="m-col">
 				<div class="m-cartera-xifres">
-					<div><span>Tot plegat</span><b>${eur(d.total)}</b><small>al compte i invertit</small></div>
-					<div><span>Al compte</span><b>${eur(d.compte.saldo_ara)}</b><small>al ${d.compte.interes.toLocaleString('ca-ES')} %: uns ${eur(d.compte.interessos_any)} l’any nets</small></div>
-					<div><span>Invertit</span><b>${eur(invertit)}</b><small class="${!aportat ? '' : guany >= 0 ? 'puja' : 'baixa'}">${aportat ? `${signeDiners(guany)} sobre el que hi has posat` : 'encara no ha començat'}</small></div>
+					<div><span>Tot plegat</span><b>${amagat ? '•••• €' : xifraFina(d.total)}</b><small>al compte i invertit</small></div>
+					<div><span>Al compte</span><b>${amagat ? '•••• €' : xifraFina(d.compte.saldo_ara)}</b><small>al ${d.compte.interes.toLocaleString('ca-ES')} %${amagat ? '' : `: uns ${eur(d.compte.interessos_any)} l’any nets`}</small></div>
+					<div><span>Invertit</span><b>${amagat ? '•••• €' : xifraFina(invertit)}</b><small class="${amagat || !aportat ? '' : guany >= 0 ? 'puja' : 'baixa'}">${amagat ? 'xifres amagades' : aportat ? `${signeFi(guany)} sobre el que hi has posat` : 'encara no ha començat'}</small></div>
 				</div>
-				${invertit > 0 ? repartiment([...inversionsActives.map((i, k) => ({nom: i.nom, valor: i.valor, color: COLORS_PARTS[k % COLORS_PARTS.length]})), ...criptos.filter((c) => c.valor > 0).map((c, k) => ({nom: c.nom, valor: c.valor, color: COLORS_PARTS[(inversionsActives.length + k) % COLORS_PARTS.length]})), {nom: 'Al compte', valor: d.compte.saldo_ara, color: COLOR_RESERVA}]) : ''}
+				${!amagat && invertit > 0 ? repartiment([...inversionsActives.map((i, k) => ({nom: i.nom, valor: i.valor, color: COLORS_PARTS[k % COLORS_PARTS.length]})), ...criptos.filter((c) => c.valor > 0).map((c, k) => ({nom: c.nom, valor: c.valor, color: COLORS_PARTS[(inversionsActives.length + k) % COLORS_PARTS.length]})), {nom: 'Al compte', valor: d.compte.saldo_ara, color: COLOR_RESERVA}]) : ''}
 				<p class="m-costos">El saldo és el del ${dataBarra(d.compte.data)}, menys el que en treuen el pla i el Bitcoin, i més els interessos (ja sense el 19 % d’Hisenda). La nòmina que hi entra no la sé: dis-m’ho i el poso al dia.</p>
 			</div>
-			<ul class="m-posicions">${d.inversions
-				.map(
-					(i) => `<li><header><b>${esc(i.nom)}</b><span>${eur(i.import)} cada dia ${i.dia}</span><em class="m-proxima">Pròxima: ${dataBarra(i.proxima)}</em></header>
+			${
+				amagat
+					? `<p class="m-peu">Xifres amagades. Toca «Mostra» a dalt per veure el detall de cada posició.</p>`
+					: `<ul class="m-posicions">${d.inversions
+							.map((i) => {
+								const guanyI = i.valor - i.aportat - i.saveback;
+								return `<li><header><b>${esc(i.nom)}</b>${i.compres.length ? `<span>${xifraFina(i.aportat)} → <strong>${xifraFina(i.valor)}</strong></span><em class="${guanyI >= 0 ? 'puja' : 'baixa'}">${signeFi(guanyI)}</em>` : `<em class="m-proxima">Pròxima: ${dataBarra(i.proxima)}</em>`}</header>
 				${
 					i.compres.length
-						? `<p>Hi has posat <b>${eur(i.aportat)}</b>${i.saveback ? ` (més ${eur(i.saveback)} de Saveback)` : ''} · ara valen <b>${eur(i.valor)}</b>; si les vengués avui, en quedarien ${eur(i.net)}.</p>
+						? `<p>Hi has posat <b>${xifraFina(i.aportat)}</b>${i.saveback ? ` (més ${xifraFina(i.saveback)} de Saveback)` : ''} · ${i.participacions.toLocaleString('ca-ES', {maximumFractionDigits: 3})} participacions · ara valen <b>${xifraFina(i.valor)}</b>; si les vengués avui, en quedarien ${xifraFina(i.net)}. Pròxima: ${dataBarra(i.proxima)} (${eur(i.import)}).</p>
 				<div class="m-taula"><table class="m-compres"><thead><tr><th>Dia</th><th>Import</th><th>Preu</th><th>Part.</th><th></th></tr></thead><tbody>${[...i.compres]
 					.reverse()
 					.map(
-						(x) => `<tr><td>${dataBarra(x.data)}</td><td>${eur(x.import)}</td><td>${x.preu.toLocaleString('ca-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2})} €</td><td>${x.participacions.toLocaleString('ca-ES', {maximumFractionDigits: 3})}</td><td><em class="m-etiq ${x.saveback ? '' : x.estimada ? 'estimada' : 'real'}">${x.saveback ? 'Saveback' : x.estimada ? 'estimada' : 'real'}</em></td></tr>`,
+						(x) => `<tr><td>${dataBarra(x.data)}</td><td>${x.import < 100 ? xifraFina(x.import) : eur(x.import)}</td><td>${x.preu.toLocaleString('ca-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2})} €</td><td>${x.participacions.toLocaleString('ca-ES', {maximumFractionDigits: 3})}</td><td><em class="m-etiq ${x.saveback ? '' : x.estimada ? 'estimada' : 'real'}">${x.saveback ? 'Saveback' : x.estimada ? 'estimada' : 'real'}</em></td></tr>`,
 					)
 					.join('')}</tbody></table></div>`
 						: `<p>El pla comença el <b>${dataBarra(i.inici)}</b>: ${eur(i.import)} cada mes, sense comissió. ISIN ${esc(i.isin)}. També hi va a parar l’1 % del Saveback de la targeta.</p>`
-				}</li>`,
-				)
-				.join('')}${criptos
-				.map(
-					(c) => `<li><header><b>${esc(c.nom)}</b>${c.setmana != null ? `<span class="${c.setmana >= 0 ? 'puja' : 'baixa'}">${pct(c.setmana)}</span>` : ''}</header>
-				<p>Hi has posat <b>${eur(c.import)}</b> el ${dataBarra(c.data)} · ${c.quantitat.toLocaleString('ca-ES', {minimumFractionDigits: 6, maximumFractionDigits: 6})} ${esc(c.simbol.split('-')[0])} a ${eur(c.preu)}${
-						c.preu_ara !== null ? ` · ara valen <b>${eur(c.valor)}</b> (${signeDiners(c.guany)}); si els vengués avui, en quedarien ${eur(c.net)}` : ''
-					}.</p></li>`,
-				)
-				.join('')}</ul>
+				}</li>`;
+							})
+							.join('')}${criptos
+							.map(
+								(c) => `<li><header><b>${esc(c.nom)}</b><span>${xifraFina(c.import)} → <strong>${xifraFina(c.valor)}</strong></span><em class="${c.guany >= 0 ? 'puja' : 'baixa'}">${signeFi(c.guany)}</em></header>
+				<p>Hi has posat <b>${xifraFina(c.import)}</b> el ${dataBarra(c.data)} · ${c.quantitat.toLocaleString('ca-ES', {minimumFractionDigits: 6, maximumFractionDigits: 6})} ${esc(c.simbol.split('-')[0])}${
+									c.preu_ara !== null ? ` · ara valen <b>${xifraFina(c.valor)}</b>; si els vengués avui, en quedarien ${xifraFina(c.net)}` : ''
+								}.</p></li>`,
+							)
+							.join('')}</ul>`
+			}
+		</div>
+	</section>`;
+}
+
+// simulador / taula de prediccions: què treuria net (sense comissions, spread ni Hisenda) si vengués a un preu concret
+function actiusSimulables(d) {
+	if (!d) return [];
+	const actius = [];
+	const perSimbol = new Map();
+	for (const c of d.cripto ?? []) {
+		if (!c.preu_ara || c.quantitat <= 0) continue;
+		const prev = perSimbol.get(c.simbol);
+		if (prev) {
+			prev.unitats += c.quantitat;
+			prev.aportat += c.import;
+			prev.baseFiscal += c.import;
+		} else {
+			perSimbol.set(c.simbol, {
+				id: `cripto-${c.simbol}`,
+				nom: c.nom,
+				esCripto: true,
+				unitats: c.quantitat,
+				aportat: c.import,
+				baseFiscal: c.import,
+				preuAra: c.preu_ara,
+			});
+		}
+	}
+	actius.push(...perSimbol.values());
+	for (const i of d.inversions ?? []) {
+		if (!i.preu_ara || i.participacions <= 0) continue;
+		actius.push({
+			id: `inv-${i.id}`,
+			nom: i.nom,
+			esCripto: false,
+			unitats: i.participacions,
+			aportat: i.aportat,
+			baseFiscal: i.aportat + i.saveback,
+			preuAra: i.preu_ara,
+		});
+	}
+	return actius;
+}
+function preuDefecteSim(a) {
+	if (!a) return '';
+	if (a.esCripto && a.preuAra >= 15000 && a.preuAra < 100000) return '100000';
+	const pas = a.preuAra >= 20000 ? 10000 : a.preuAra >= 2000 ? 500 : a.preuAra >= 200 ? 25 : 10;
+	return String(Math.round((a.preuAra * 1.25) / pas) * pas);
+}
+function parsejarPreuSim(s) {
+	const net = String(s ?? '').trim();
+	if (!net) return NaN;
+	if (net.includes(',')) return Number(net.replace(/\./g, '').replace(',', '.'));
+	if (/^\d{1,3}(\.\d{3})+$/.test(net)) return Number(net.replace(/\./g, ''));
+	return Number(net);
+}
+function calcularNetSim(a, preuObj, costos) {
+	const brut = a.unitats * preuObj;
+	const spread = a.esCripto ? brut * (costos?.spread_cripto ?? 0.01) : 0;
+	const ordre = brut > 0 ? (costos?.ordre ?? 1) : 0;
+	const venda = Math.max(0, brut - spread - ordre);
+	const guanyFiscal = venda - a.baseFiscal;
+	const impost = Math.max(0, guanyFiscal) * (costos?.impost ?? 0.19);
+	const net = Math.max(0, venda - impost);
+	const guanyNet = net - a.baseFiscal;
+	return {brut, net, guanyNet, costosTotal: spread + ordre + impost};
+}
+function escenarisPer(a) {
+	const ara = a.preuAra;
+	if (!ara || ara <= 0) return [];
+	const pas = ara >= 20000 ? 10000 : ara >= 2000 ? 500 : ara >= 200 ? 25 : 10;
+	const arrodonir = (v) => Math.max(pas, Math.round(v / pas) * pas);
+	const candidats = new Set([ara]);
+	for (const mult of [0.8, 1.15, 1.35, 1.6, 2, 2.5]) candidats.add(arrodonir(ara * mult));
+	if (a.esCripto && ara >= 15000) {
+		for (const fita of [80000, 100000, 120000, 150000, 200000]) {
+			if (fita >= ara * 0.6 && fita <= ara * 3.5) candidats.add(fita);
+		}
+	}
+	return [...candidats]
+		.filter((v) => v === ara || Math.abs(v - ara) / ara >= 0.04)
+		.sort((x, y) => x - y)
+		.slice(0, 8);
+}
+function htmlResultatSim(actiu, entrada, costos) {
+	const preuNum = parsejarPreuSim(entrada);
+	if (!Number.isFinite(preuNum) || preuNum <= 0) return '';
+	const sim = calcularNetSim(actiu, preuNum, costos);
+	const amagat = estat.amagat;
+	return `<div><span>Treuries net</span><b>${amagat ? '•••• €' : xifraFina(sim.net)}</b></div>
+		<div><span>Guany net</span><b class="${amagat ? '' : sim.guanyNet >= 0 ? 'puja' : 'baixa'}">${amagat ? '•••• €' : signeFi(sim.guanyNet)}</b></div>
+		<div><span>Hisenda i costos</span><small>${amagat ? '•••• €' : xifraFina(sim.costosTotal)}</small></div>`;
+}
+function simuladorVenda() {
+	const d = estat.diners;
+	const actius = actiusSimulables(d);
+	if (!actius.length) return '';
+	const actiu = actius.find((x) => x.id === estat.simActiu) ?? actius[0];
+	estat.simActiu = actiu.id;
+	if (estat.simPreu === null) estat.simPreu = preuDefecteSim(actiu);
+	const costos = d.costos ?? {ordre: 1, spread_cripto: 0.01, impost: 0.19};
+	const escenaris = escenarisPer(actiu);
+	const fmtPreu = (v) => `${v.toLocaleString('ca-ES', {maximumFractionDigits: v >= 1000 ? 0 : 2})} €`;
+	const amagat = estat.amagat;
+	return `<section class="m-bloc">
+		<h2 class="m-titol">Si ho vengués a… <small>el que treuries net en mà segons el preu</small></h2>
+		<div class="m-cartera m-sim">
+			${
+				actius.length > 1
+					? `<nav class="filtres m-sim-tabs" aria-label="Actiu a simular">${actius
+							.map((x) => `<button type="button" data-sim-actiu="${esc(x.id)}" aria-pressed="${x.id === actiu.id}">${esc(x.nom)}</button>`)
+							.join('')}</nav>`
+					: ''
+			}
+			<div class="m-sim-barra">
+				<label class="m-sim-camp">
+					<span>Si ${esc(actiu.nom)} arriba a</span>
+					<span class="m-sim-input">
+						<input id="sim-preu" type="text" inputmode="decimal" value="${esc(estat.simPreu)}" aria-label="Preu objectiu de ${esc(actiu.nom)} en euros">
+						<em>€</em>
+					</span>
+				</label>
+				<div class="m-sim-res" id="sim-res">${htmlResultatSim(actiu, estat.simPreu, costos)}</div>
+			</div>
+			<div class="m-taula"><table class="m-compres m-sim-taula">
+				<thead><tr><th>Preu</th><th>Canvi</th><th>Valdria</th><th>Net</th><th>Guany net</th></tr></thead>
+				<tbody>${escenaris
+					.map((p) => {
+						const r = calcularNetSim(actiu, p, costos);
+						const esAra = p === actiu.preuAra;
+						const diff = (p / actiu.preuAra - 1) * 100;
+						const val = String(Math.round(p * 100) / 100);
+						return `<tr class="${esAra ? 'ara' : ''}" data-sim-fila="${val}">
+							<td><b>${fmtPreu(p)}</b>${esAra ? ' <em class="m-etiq">ara</em>' : ''}</td>
+							<td class="${esAra ? '' : diff >= 0 ? 'puja' : 'baixa'}">${esAra ? '—' : pct(diff)}</td>
+							<td>${amagat ? '•••• €' : xifraFina(r.brut)}</td>
+							<td><strong>${amagat ? '•••• €' : xifraFina(r.net)}</strong></td>
+							<td class="${amagat ? '' : r.guanyNet >= 0 ? 'puja' : 'baixa'}">${amagat ? '•••• €' : signeFi(r.guanyNet)}</td>
+						</tr>`;
+					})
+					.join('')}</tbody>
+			</table></div>
+			<p class="m-peu">Calculat amb el que tens comprat (${amagat ? '••••' : xifraFina(actiu.baseFiscal)} posats). Descompta ${eur(costos.ordre)} de venda${actiu.esCripto ? `, un ${Math.round(costos.spread_cripto * 100)} % de diferència de preu` : ''} i el ${Math.round(costos.impost * 100)} % d’Hisenda si hi ha guany.</p>
 		</div>
 	</section>`;
 }
@@ -1196,16 +1417,21 @@ function vistaMercat() {
 				})
 				.join('')}</div></section>`
 		: '';
-	const comEsta = `${moviments}<div class="m-actius grans">${GRAFICS.flatMap((id) => m.actius.filter((a) => a.id === id))
-		.map(
-			(a) => `<article class="m-actiu gran ${a.canvis.setmana >= 0 ? 'puja' : 'baixa'}">
+	const comEsta = `${moviments}<div class="m-preus-cap"><h2 class="s-titol">Preus</h2>${botoAmagar()}</div><div class="m-actius grans">${GRAFICS.flatMap((id) => m.actius.filter((a) => a.id === id))
+		.map((a) => {
+			const pos = posicioMeva(a.id);
+			const xifraPrincipal = pos
+				? `<div class="m-preu-meu"><span class="m-preu">${estat.amagat ? '•••• €' : xifraFina(pos.valor)}</span>${!estat.amagat ? `<span class="m-preu-guany ${pos.guany >= 0 ? 'puja' : 'baixa'}">${signeFi(pos.guany)}</span>` : ''}</div>
+		<small class="m-preu-mercat">${estat.amagat ? `Preu mercat: ${preu(a)}` : `Posats: ${xifraFina(pos.aportat)} · Preu mercat: ${preu(a)}`}</small>`
+				: `<span class="m-preu">${preu(a)}</span>`;
+			return `<article class="m-actiu gran ${a.canvis.setmana >= 0 ? 'puja' : 'baixa'}">
 		<header><b>${esc(a.nom)}</b><span class="m-setmana ${a.canvis.setmana > 0 ? 'puja' : a.canvis.setmana < 0 ? 'baixa' : ''}">${a.canvis.setmana >= 0 ? '↗' : '↘'} ${pct(a.canvis.setmana)}</span></header>
-		<span class="m-preu">${preu(a)}</span>
+		${xifraPrincipal}
 		${linia(a.serie, a.canvis.mes >= 0, marquesSobre(a.serie, a.dates, fetsDe(estat.dades.edicio.targetes, a.id, estat.dades.edicio.data)), {dates: a.dates, fmt: (v) => preu({...a, preu: v})})}
 		${s?.actius?.[a.id] ? `<p>${esc(s.actius[a.id])}</p>` : ''}
 		<small class="m-mes">${a.canvis.dia !== undefined && a.dia_data ? `<span class="m-dia ${Math.abs(a.canvis.dia) >= 1.5 ? (a.canvis.dia < 0 ? 'baixa fort' : 'puja fort') : ''}">${esc(dataCurta(a.dia_data))}: ${pct(a.canvis.dia)}</span> · ` : ''}Un mes: ${pct(a.canvis.mes)}</small>
-	</article>`,
-		)
+	</article>`;
+		})
 		.join('')}
 		${AMB_BCE && m.tipus_bce !== undefined ? `<article class="m-actiu m-bce"><header><b>Tipus del BCE</b></header><span class="m-preu">${m.tipus_bce.toLocaleString('ca-ES', {minimumFractionDigits: 2})} %</span>${s?.actius?.compte ? `<p>${esc(s.actius.compte)}</p>` : ''}</article>` : ''}
 	</div>
@@ -1388,7 +1614,7 @@ function vistaMercat() {
 		<span class="sobre">Mercat${s?.data ? ` · setmana del ${dataBarra(s.data)}` : ''}</span>
 		<h1>Com està el mercat</h1>
 	</header>
-	${comEsta}${dinersMeus()}${despesesMeves()}${perQue}${laLlibreta()}${dinsMsci(estat.dades.msci, m.actius.find((x) => x.id === 'msci')?.canvis.setmana)}${cartera}${apostes}${futur}${grans}
+	${comEsta}${dinersMeus()}${simuladorVenda()}${despesesMeves()}${perQue}${laLlibreta()}${dinsMsci(estat.dades.msci, m.actius.find((x) => x.id === 'msci')?.canvis.setmana)}${cartera}${apostes}${futur}${grans}
 	<p class="m-peu">L’anàlisi es posa al dia cada dia feiner. Reshi analitza i explica: no és un assessor financer.</p>`;
 }
 
@@ -1613,8 +1839,33 @@ window.addEventListener('popstate', () => {
 });
 
 document.addEventListener('click', (ev) => {
-	const b = ev.target.closest('button');
+	const amagar = ev.target.closest('[data-amagar-diners]');
+	if (amagar) {
+		estat.amagat = !estat.amagat;
+		guardat.posar('reshi-amagar-diners', estat.amagat ? 1 : 0);
+		pintar();
+		return;
+	}
+	const filaSim = ev.target.closest('[data-sim-fila]');
+	if (filaSim) {
+		estat.simPreu = filaSim.dataset.simFila;
+		const input = document.getElementById('sim-preu');
+		const res = document.getElementById('sim-res');
+		if (input) input.value = estat.simPreu;
+		const actius = actiusSimulables(estat.diners);
+		const actiu = actius.find((x) => x.id === estat.simActiu) ?? actius[0];
+		if (res && actiu) res.innerHTML = htmlResultatSim(actiu, estat.simPreu, estat.diners?.costos);
+		return;
+	}
+	const b = ev.target.closest('button, [role="button"][data-vista]');
 	if (!b) return;
+	if (b.dataset.simActiu) {
+		estat.simActiu = b.dataset.simActiu;
+		const actiu = actiusSimulables(estat.diners).find((x) => x.id === estat.simActiu);
+		estat.simPreu = preuDefecteSim(actiu);
+		pintar();
+		return;
+	}
 	if (b.dataset.vista) {
 		estat.vista = b.dataset.vista;
 		refreshLlegides();
@@ -1738,7 +1989,26 @@ document.addEventListener(
 	{passive: true},
 );
 
+document.addEventListener('input', (ev) => {
+	if (ev.target.id !== 'sim-preu') return;
+	const net = ev.target.value.replace(/[^\d.,]/g, '');
+	if (net !== ev.target.value) ev.target.value = net;
+	estat.simPreu = net;
+	const res = document.getElementById('sim-res');
+	const actius = actiusSimulables(estat.diners);
+	const actiu = actius.find((x) => x.id === estat.simActiu) ?? actius[0];
+	if (res && actiu) res.innerHTML = htmlResultatSim(actiu, net, estat.diners?.costos);
+});
+
 document.addEventListener('keydown', (ev) => {
+	if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches?.('[role="button"][data-vista]')) {
+		ev.preventDefault();
+		estat.vista = ev.target.dataset.vista;
+		refreshLlegides();
+		pintar();
+		window.scrollTo(0, 0);
+		return;
+	}
 	if (estat.lector === null) return;
 	const pistes = document.getElementById('pistes');
 	if (ev.key === 'Escape') history.back();
