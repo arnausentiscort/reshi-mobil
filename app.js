@@ -587,7 +587,7 @@ function fitxaDespeses() {
 // i, si els últims dies hi ha hagut un moviment fort, ho diu aquí mateix
 // el que té invertit de debò (amb el codi posat): quant val ara i quant hi guanya o hi perd
 const xifraFina = (x) => `${x.toLocaleString('ca-ES', Math.abs(x) < 10000 ? {minimumFractionDigits: 2, maximumFractionDigits: 2} : {maximumFractionDigits: 0})} €`;
-const signeFi = (x) => `${x >= 0 ? '+' : '−'}${xifraFina(Math.abs(x))}`;
+const signeFi = (x) => `${(Math.abs(x) < 0.005 ? 0 : x) >= 0 ? '+' : '−'}${xifraFina(Math.abs(x))}`;
 function meuInvertit() {
 	const inv = estat.diners?.inversions ?? [];
 	const cripto = estat.diners?.cripto ?? [];
@@ -1087,7 +1087,7 @@ function posicioMeva(id) {
 	const meus = estat.diners;
 	if (!meus) return null;
 	if (id === 'msci') {
-		const invs = meus.inversions ?? [];
+		const invs = (meus.inversions ?? []).filter((i) => i.id === 'msci');
 		const valor = invs.reduce((s, i) => s + i.valor, 0);
 		const aportat = invs.reduce((s, i) => s + i.aportat, 0);
 		if (!valor && !aportat) return null;
@@ -1112,11 +1112,11 @@ function dinersMeus() {
 	if (!d) return estat.personal ? '' : formCodi('Els teus diners', 'Posa el codi per veure el que tens de debò al compte i invertit.');
 	const amagat = estat.amagat;
 	const criptos = d.cripto ?? [];
-	const invertitInversions = d.inversions.reduce((t, i) => t + i.valor, 0);
-	const aportatInversions = d.inversions.reduce((t, i) => t + i.aportat, 0);
+	const invertitInversions = (d.inversions ?? []).reduce((t, i) => t + i.valor, 0);
+	const aportatInversions = (d.inversions ?? []).reduce((t, i) => t + i.aportat, 0);
 	const invertit = invertitInversions + criptos.reduce((t, c) => t + c.valor, 0);
 	const aportat = aportatInversions + criptos.reduce((t, c) => t + c.import, 0);
-	const guany = invertitInversions - aportatInversions - d.inversions.reduce((t, i) => t + i.saveback, 0) + criptos.reduce((t, c) => t + c.guany, 0);
+	const guany = invertitInversions - aportatInversions - (d.inversions ?? []).reduce((t, i) => t + i.saveback, 0) + criptos.reduce((t, c) => t + c.guany, 0);
 	const inversionsActives = d.inversions.filter((i) => i.valor > 0);
 	return `<section class="m-bloc">
 		<h2 class="m-titol m-meus-cap">Els meus diners <small>el que tens de debò a ${esc(d.compte.nom)}</small>${botoAmagar()}</h2>
@@ -1153,7 +1153,7 @@ function dinersMeus() {
 							.map(
 								(c) => `<li><header><b>${esc(c.nom)}</b><span>${xifraFina(c.import)} → <strong>${xifraFina(c.valor)}</strong></span><em class="${c.guany >= 0 ? 'puja' : 'baixa'}">${signeFi(c.guany)}</em></header>
 				<p>Hi has posat <b>${xifraFina(c.import)}</b> el ${dataBarra(c.data)} · ${c.quantitat.toLocaleString('ca-ES', {minimumFractionDigits: 6, maximumFractionDigits: 6})} ${esc(c.simbol.split('-')[0])}${
-									c.preu_ara !== null ? ` · ara valen <b>${xifraFina(c.valor)}</b>; si els vengués avui, en quedarien ${xifraFina(c.net)}` : ''
+									c.preu_ara != null ? ` · ara valen <b>${xifraFina(c.valor)}</b>; si els vengués avui, en quedarien ${xifraFina(c.net)}` : ''
 								}.</p></li>`,
 							)
 							.join('')}</ul>`
@@ -1205,7 +1205,7 @@ function preuDefecteSim(a) {
 	if (!a) return '';
 	if (a.esCripto && a.preuAra >= 15000 && a.preuAra < 100000) return '100000';
 	const pas = a.preuAra >= 20000 ? 10000 : a.preuAra >= 2000 ? 500 : a.preuAra >= 200 ? 25 : 10;
-	return String(Math.round((a.preuAra * 1.25) / pas) * pas);
+	return String(Math.max(pas, Math.round((a.preuAra * 1.25) / pas) * pas));
 }
 function parsejarPreuSim(s) {
 	const net = String(s ?? '').trim();
@@ -1289,7 +1289,7 @@ function simuladorVenda() {
 						const r = calcularNetSim(actiu, p, costos);
 						const esAra = p === actiu.preuAra;
 						const diff = (p / actiu.preuAra - 1) * 100;
-						const val = String(Math.round(p * 100) / 100);
+						const val = String(Math.round(p * 100) / 100).replace('.', ',');
 						return `<tr class="${esAra ? 'ara' : ''}" data-sim-fila="${val}">
 							<td><b>${fmtPreu(p)}</b>${esAra ? ' <em class="m-etiq">ara</em>' : ''}</td>
 							<td class="${esAra ? '' : diff >= 0 ? 'puja' : 'baixa'}">${esAra ? '—' : pct(diff)}</td>
@@ -1300,7 +1300,7 @@ function simuladorVenda() {
 					})
 					.join('')}</tbody>
 			</table></div>
-			<p class="m-peu">Calculat amb el que tens comprat (${amagat ? '••••' : xifraFina(actiu.baseFiscal)} posats). Descompta ${eur(costos.ordre)} de venda${actiu.esCripto ? `, un ${Math.round(costos.spread_cripto * 100)} % de diferència de preu` : ''} i el ${Math.round(costos.impost * 100)} % d’Hisenda si hi ha guany.</p>
+			<p class="m-peu">Calculat amb el que tens comprat (${amagat ? '••••' : xifraFina(actiu.baseFiscal)} posats). Descompta ${eur(costos.ordre)} de venda${actiu.esCripto ? `, un ${(costos.spread_cripto * 100).toLocaleString("ca-ES", {maximumFractionDigits: 1})} % de diferència de preu` : ''} i el ${Math.round(costos.impost * 100)} % d’Hisenda si hi ha guany.</p>
 		</div>
 	</section>`;
 }
@@ -1339,7 +1339,7 @@ function despesesMeves() {
 		${comp ? `<p class="m-peu">Al compte compartit amb la Núria s’hi ha gastat ${eur(comp.despesa)} aquest mes.</p>` : ''}
 	</section>`;
 }
-const signeDiners = (x) => `${x >= 0 ? '+' : '−'}${eur(Math.abs(x))}`;
+const signeDiners = (x) => `${(Math.abs(x) < 0.005 ? 0 : x) >= 0 ? '+' : '−'}${eur(Math.abs(x))}`;
 
 // el Mercat, més net: una fila amb què li toca a cada cosa que té o mira (en triar-ne una, només queden les notícies
 // d'aquella cosa), les causes de la setmana en targetes grans amb foto, i la llibreta d'encerts plegada en una línia.
@@ -1466,7 +1466,7 @@ function vistaMercat() {
 	</section>`
 		: '';
 
-	const signe = (x) => `${x >= 0 ? '+' : '−'}${eur(Math.abs(x))}`;
+	const signe = (x) => `${(Math.abs(x) < 0.005 ? 0 : x) >= 0 ? '+' : '−'}${eur(Math.abs(x))}`;
 	const cartera = c
 		? `<section class="m-bloc${plegat('capital') ? ' plegat' : ''}">
 		${titolPlegable('capital', 'Reshi Capital <small>10.000 € ficticis que gestiono jo, amb comissions i impostos de debò</small>', `${eur(c.valor)} · ${signe(c.valor - c.capital)}`)}
