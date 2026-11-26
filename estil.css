@@ -1175,3 +1175,15 @@ main.pantalla .m-titol, main.pantalla .s-titol { scroll-margin-top: 80px; }
 .m-sim-taula td.puja { color: var(--bo); }
 .m-sim-taula td.baixa { color: var(--dolent); }
 .m-sim-taula strong { color: var(--fort); }
+
+/* --- mode clar, pantalla ampla: la portada de Notícies posa el text al costat de la foto (no a sobre), així que va amb els
+   colors del tema; el blanc només val quan el text és a sobre de la foto, en pantalla estreta --- */
+@media (min-width: 760px) {
+	[data-mode='clar'] .portada-text h2, [data-mode='clar'] .portada .xifra b { color: var(--fort); }
+	[data-mode='clar'] .portada-text p, [data-mode='clar'] .portada .xifra span { color: var(--text-2); }
+	[data-mode='clar'] .portada .etiqueta, [data-mode='clar'] .portada .nou { color: var(--text-3); }
+	[data-mode='clar'] .portada .nou:not(.vist) { color: var(--or); }
+}
+@media (max-width: 759px) {
+	[data-mode='clar'] .portada .xifra b { color: #fff; }
+}
